@@ -1,0 +1,3 @@
+Alembic async migrations. URL + metadata come from core.config / db.base (see env.py).
+Create a revision:  alembic revision --autogenerate -m "message"
+Apply:              alembic upgrade head

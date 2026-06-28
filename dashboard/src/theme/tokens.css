@@ -1,0 +1,28 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --kite-blue: #387ed1;
+  --green: #4caf50;
+  --red: #ff5722;
+  --bg: #ffffff;
+  --bg-alt: #f9f9f9;
+  --text: #3c3c3c;
+  --muted: #9b9b9b;
+  --border: #e0e0e0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", system-ui, sans-serif;
+  color: var(--text);
+  background: var(--bg-alt);
+  -webkit-font-smoothing: antialiased;
+}

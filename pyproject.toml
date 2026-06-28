@@ -1,0 +1,62 @@
+[project]
+name = "trade-engine"
+version = "0.1.0"
+description = "Intraday algo trade engine (Zerodha Kite) + Kite-styled dashboard"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic>=2",
+    "pydantic-settings",
+    "sqlalchemy[asyncio]>=2",
+    "aiosqlite",
+    "alembic",
+    "kiteconnect",
+    "argon2-cffi",
+    "pyjwt",
+    "cryptography",
+    "structlog",
+    "httpx",
+    "python-multipart",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+    "ruff",
+    "black",
+    "mypy",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["core", "db", "integrations", "services", "api", "engine", "strategies"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# E501: line length handled by black; B008: FastAPI Depends() in defaults is the framework idiom;
+# UP040/UP046/UP047: PEP 695 type-param syntax is optional, not required for 3.12.
+ignore = ["E501", "B008", "UP040", "UP046", "UP047"]
+
+[tool.black]
+line-length = 100
+target-version = ["py312"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+warn_unused_ignores = false
+plugins = ["pydantic.mypy"]
+exclude = ["dashboard/", "archive/", "db/migrations/"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
