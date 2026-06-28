@@ -59,22 +59,26 @@ Set these two fields on the app (replace the domain with your real one):
 
 ## 3. App-login credentials (static, single user)
 
-As requested, the dashboard login is a fixed user:
+The dashboard login is a single fixed user:
 
 ```
 username: mrahuja
-password: UseLess@420
+password: <DASHBOARD_PASSWORD>   # the value chosen by the owner — kept ONLY in .env, never in git
 ```
 
-**These live in `.env` (gitignored), and the password is stored as an argon2 hash — never plaintext, never committed.**
+**The password value is never written in the repo.** It lives only in `.env` (gitignored), and
+even there only as an **argon2id hash** (`APP_PASSWORD_HASH`). The owner knows the plaintext and
+generates the hash locally (below).
 
-> ⚠️ **Security note:** committing a real password to a repo is unsafe. We store only the
-> **argon2id hash** in `.env`. Rotate this before the dashboard is ever exposed publicly, and
-> keep `.env` out of git. The plaintext above is documented only because you specified it for the MVP.
+> ⚠️ **Security note:** secrets must not be committed (see README §4 "No secrets in git"). The
+> plaintext password is therefore intentionally **redacted** from this doc. If a real password was
+> ever committed in earlier history, treat it as compromised and **rotate it** — generate a new
+> hash and update `.env`. (Rotation is the fix; rewriting the pushed default branch's history is
+> riskier and optional.)
 
 Generate the hash with the helper script (built in step 4.4):
 ```bash
-python scripts/hash_password.py 'UseLess@420'
+python scripts/hash_password.py '<DASHBOARD_PASSWORD>'
 # → $argon2id$v=19$m=65536,t=3,p=4$....   (paste into APP_PASSWORD_HASH)
 ```
 
@@ -119,7 +123,7 @@ DB_PATH=./data/trade.db
 APP_SECRET=change-me-long-random
 KILL_TOKEN=change-me-random
 APP_USERNAME=mrahuja
-APP_PASSWORD_HASH=<paste argon2 hash of UseLess@420>
+APP_PASSWORD_HASH=<argon2 hash of your dashboard password>
 # Kite credentials are OPTIONAL here — they bootstrap the DB on first run.
 # Preferred: leave blank and enter them in the in-app Settings page (stored encrypted in DB).
 KITE_API_KEY=
@@ -296,27 +300,32 @@ def logout(response: Response, _=Depends(require_csrf)):
 
 `api/routes/kite.py`:
 ```python
-@router.get("/login-url")
-def kite_login_url(user=Depends(current_user)):
-    return ApiResponse(data={"url": login_url()})
+@router.get("/login-url")                       # all handlers async — they await DB + auth lib
+async def kite_login_url(session=Depends(get_session), user=Depends(current_user)):
+    return ApiResponse(data={"url": await login_url(session)})
 
-@router.get("/callback")                       # Zerodha redirects the browser here
-def kite_callback(request_token: str, status: str = "success"):
+@router.get("/callback")                        # Zerodha redirects the browser here
+async def kite_callback(request_token: str, status: str = "success",
+                        session=Depends(get_session)):
     if status != "success": raise KiteError("kite login failed")
-    data = exchange(request_token)
-    kite_service.store_session(data)           # encrypt + upsert kite_session + set token
+    data = await exchange(session, request_token)
+    await kite_service.store_session(session, data)   # encrypt + upsert kite_session + set token
+    await session.commit()
     return RedirectResponse(url="/?kite=connected", status_code=302)
 
 @router.get("/status")
-def kite_status(user=Depends(current_user)):
-    return ApiResponse(data=kite_service.status())   # {connected, user_id, valid_for_date}
+async def kite_status(session=Depends(get_session), user=Depends(current_user)):
+    return ApiResponse(data=await kite_service.status(session))  # {connected, user_id, valid_for_date}
 
-@router.post("/postback")                      # public; Kite order updates (Task 07 consumes)
+@router.post("/postback")                       # public; Kite order updates (Task 07 consumes)
 async def kite_postback(request: Request):
     payload = await request.json()
     # TODO(Task07): verify checksum SHA-256(order_id+order_timestamp+api_secret); enqueue update
     log.info("kite_postback", payload=payload); return {"ok": True}
 ```
+> **Convention:** any handler that touches the DB or the (async) Kite credential/session helpers
+> is declared `async def` and `await`s them. Pure-CPU handlers (e.g. `/auth/login`, which only
+> hashes + signs) may stay `def`. Don't call an `async` helper from a `def` handler.
 `services/settings_service.py` — encrypted key-value accessor (reused by routes + kite):
 ```python
 async def get(session, key: str) -> str | None:
@@ -400,7 +409,7 @@ cd dashboard && npm run dev      # http://localhost:5173
 
 ## 5. Definition of Done
 - [ ] Repo restructured; old static site in `archive/legacy-site/`; FTP workflow removed.
-- [ ] `.env.example` committed; `.env` gitignored; `APP_PASSWORD_HASH` generated for `UseLess@420`.
+- [ ] `.env.example` committed; `.env` gitignored; `APP_PASSWORD_HASH` generated for `<DASHBOARD_PASSWORD>`.
 - [ ] `alembic upgrade head` creates `kite_session` + `events` + `settings` (WAL enabled).
 - [ ] Shared kernel (`core/*`) + `db/{base,repository,models}` + `BaseRepository` in place.
 - [ ] App login works: bad creds rejected + throttled; good creds set HttpOnly+CSRF cookies; `/me` returns user; logout clears.
@@ -413,8 +422,8 @@ cd dashboard && npm run dev      # http://localhost:5173
 - [ ] `ruff`/`mypy`/`pytest` green in CI; frontend builds; app served by FastAPI in one process.
 
 ## 6. How to verify (manual)
-1. `python scripts/hash_password.py 'UseLess@420'` → paste into `.env`.
-2. Start backend + frontend. Visit `/login`, enter `mrahuja` / `UseLess@420` → land on dashboard.
+1. `python scripts/hash_password.py '<DASHBOARD_PASSWORD>'` → paste into `.env`.
+2. Start backend + frontend. Visit `/login`, enter `mrahuja` / `<DASHBOARD_PASSWORD>` → land on dashboard.
    Try a wrong password 5× → locked out (verify 403/lockout message).
 3. Open **Settings** → paste your Kite `api_key` + `api_secret` → Save. Reload: key is prefilled,
    secret shows "set ✓" (and is **not** present in the `/api/settings` response body).

@@ -204,7 +204,7 @@ The engine (writer) and API (mostly reader) share one SQLite file — handled de
 - **Daily lifecycle:** market-hours window 09:15–15:30 IST; morning **semi-auto Kite login**;
   daily instruments dump; forced square-off + EOD summary alert.
 - **Backups:** scheduled copy of the SQLite file (+ WAL) off-box.
-- Full runbook will **replace the obsolete `docs/deployment.md`** (currently static-site FTP).
+- Full VPS runbook lives in **[deployment.md](deployment.md)** (the old static-site FTP runbook has been replaced).
 
 ---
 

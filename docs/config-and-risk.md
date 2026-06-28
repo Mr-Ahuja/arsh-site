@@ -50,8 +50,10 @@ fills:
   slippage_bps: 3
   fill_delay_ticks: 1
   full_fill: true
-  participation_pct: null   # set to model thin liquidity
+  participation_pct: null      # set to model thin liquidity (needs full-mode depth)
   require_trade_through: false
+  enforce_circuit_limits: true # uses Kite quote() circuit band; auto-off if unavailable
+  enforce_liquidity: true      # uses KiteTicker full-mode depth; auto-off if unavailable
 ```
 
 ### Resolution rules

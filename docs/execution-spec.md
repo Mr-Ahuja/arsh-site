@@ -51,6 +51,27 @@ Runs on the **live Kite Ticker** stream; we simulate fills. Defaults are **pessi
 
 ---
 
+### 2a. Data sources for circuit-limit & liquidity simulation
+These rules need concrete inputs. Sources (all from Kite, so paper == live):
+
+| Input | Source | Notes |
+|-------|--------|-------|
+| **Circuit band** (upper/lower) | Kite **`quote()` REST** fields `upper_circuit_limit` / `lower_circuit_limit` | Fetched once at strategy start and cached for the day (KiteTicker does not carry it reliably). |
+| **Best bid/ask + spread** | **KiteTicker "full" mode** market depth (5 levels) | Subscribe in *full* mode (not *ltp*/*quote*) so depth is present. |
+| **Depth / liquidity** | KiteTicker full-mode depth quantities | Empty/zero depth ⇒ treated as no liquidity. |
+| **Tick volume** (participation) | Tick `last_traded_quantity` / `volume_traded` | Drives the optional participation cap. |
+
+**Per-mode availability (rules auto-disable when their data is absent — and the run is flagged):**
+- **Paper (live full-mode ticks):** depth + circuit band available → all rules active.
+- **Backtest tick-replay:** active **only if** the tick archive recorded full-mode **depth** and the
+  day's **circuit band**. Therefore the archiver (FR-11) must persist depth snapshots + the cached
+  circuit band; otherwise depth/circuit rejection is disabled for that replay.
+- **Backtest OHLC:** no depth, no circuit band in historical OHLC → **circuit & liquidity
+  simulation disabled**; only price-based slippage applies (run labelled approximate).
+
+Toggle via `fills.enforce_circuit_limits` / `fills.enforce_liquidity` (config-and-risk.md);
+both **auto-off** when the required data isn't available rather than fabricating values.
+
 ## 3. Backtest Fill Model
 
 Two data granularities, chosen automatically by availability/strategy needs (see §6):
@@ -115,6 +136,30 @@ On every engine start, before processing ticks:
    stay halted and alert.
 
 `pos.vars` is persisted on every mutation (FR-4), so trailing cutoffs/peaks survive the restart.
+
+### 5a. SAFE mode — exact operator actions
+SAFE mode is entered whenever reconciliation finds a mismatch the engine must not auto-resolve
+(e.g. DB flat but Kite holds a position, or an in-flight order can't be resolved). In SAFE mode
+the engine **halts new entries, stops emitting orders, keeps streaming/monitoring, and alerts**
+(Telegram + `events`) with the mismatch detail. It stays halted until the operator resolves it.
+
+The cockpit shows a **SAFE-mode banner** with the broker position vs engine view and **three
+buttons**, each backed by an auth+CSRF API (these are *reconciliation* controls, an explicit
+extension of the "monitor + kill-switch" scope — they place/await at most one order):
+
+| UI action | API | Engine behaviour |
+|-----------|-----|------------------|
+| **Adopt position** | `POST /api/engine/reconcile/adopt` | Create an engine `Position` from the broker's actual position (symbol, side, qty, avg price), initialise empty `pos.vars`, attach it to the running strategy so `on_tick`/`exit` manage it from now on. Logs an adoption event. |
+| **Square off now** | `POST /api/engine/reconcile/square-off` | Place a MARKET MIS order to flatten the broker position immediately; wait for fill confirmation; record the trade; stay halted. |
+| **Resume** | `POST /api/engine/resume` | Only enabled once the position view is consistent (flat-flat or adopted). Clears SAFE mode and re-enables entries. |
+
+**LLD nuances:**
+- **Adopt** hands an externally-created position to the strategy with **fresh `pos.vars`** — the
+  strategy's trailing/cutoff state is rebuilt from scratch on subsequent ticks (it has no memory
+  of how the position was opened). The banner warns about this before confirming.
+- **Square off now** is the safe default when the position is unexpected/unknown.
+- All three are **idempotent** and audited; they are rejected (409) if SAFE mode is not active.
+- The emergency **kill-switch** remains available in SAFE mode and force-flattens everything.
 
 ---
 

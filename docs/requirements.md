@@ -146,6 +146,9 @@ See **[strategy-framework.md](strategy-framework.md)** for the full contract.
 - FR-18: Configurable **max-trades/day** (default 10) and **per-trade cap** (default ₹50,000
   notional, clamp on breach).
 - FR-19: Manual **emergency kill-switch** from the dashboard (+ `KILL_TOKEN` fast path).
+- FR-19a: **SAFE-mode reconciliation controls** — when the engine halts on a DB↔Kite mismatch,
+  the dashboard exposes **Adopt position / Square off now / Resume** (auth+CSRF). This is a
+  deliberate, narrow extension of the "monitor + kill-switch" scope; details in execution-spec.md §5a.
 - FR-20: Auto-halt on broker disconnect / token expiry / repeated order errors + alert.
 - FR-20a: Enforcement order is strategy → per-trade cap → max-trades → daily-loss → forced
   square-off (backstops win); see config-and-risk.md §3.
