@@ -6,3 +6,4 @@
 *.service   text eol=lf
 Caddyfile   text eol=lf
 *.py        text eol=lf
+*.bat       text eol=crlf

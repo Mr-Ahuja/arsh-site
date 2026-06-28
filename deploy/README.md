@@ -71,7 +71,7 @@ Visit `https://<your-domain>` → log in → **Settings** (enter Kite api_key/se
 
 ---
 
-## Updating an existing deployment
+## Updating an existing deployment (manual)
 
 ```bash
 cd /opt/trade-engine/app
@@ -80,3 +80,58 @@ sudo systemctl restart api.service
 ```
 
 Run during non-market hours. Logs: `journalctl -u api -f`.
+
+---
+
+## Automatic deployment (GitHub Actions → VPS)
+
+`.github/workflows/deploy.yml` deploys on every push to **main** (merge a `develop → main`
+release PR) and via **Run workflow** (manual). It builds the server `.env` from GitHub
+Secrets/Variables, then SSHes in to `git reset --hard origin/main` → `deploy.sh` →
+`systemctl restart api.service`. If the SSH secrets are absent it skips and stays green.
+
+### What's already configured in this repo
+| Kind | Name | Value |
+|------|------|-------|
+| Variable | `APP_USERNAME` | `mrahuja` |
+| Variable | `BASE_URL` | `https://arsh.thechosenone.in` |
+| Secret | `APP_PASSWORD_HASH` | argon2id hash of the dashboard password |
+| Secret | `APP_SECRET` | random 32-byte hex (session/JWT + at-rest key) |
+| Secret | `KILL_TOKEN` | random 16-byte hex |
+
+### What YOU must add for end-to-end automation
+Settings → Secrets and variables → Actions:
+
+| Kind | Name | Required | Notes |
+|------|------|----------|-------|
+| Secret | `VPS_HOST` | ✅ | VPS IP or hostname |
+| Secret | `VPS_USER` | ✅ | SSH user (e.g. `trader`) — see sudoers below |
+| Secret | `VPS_SSH_KEY` | ✅ | **private** key; its public half in the user's `~/.ssh/authorized_keys` |
+| Secret | `VPS_PORT` | optional | SSH port, default `22` |
+| Secret | `VPS_APP_DIR` | optional | default `/opt/trade-engine/app` |
+| Secret | `KITE_API_KEY` / `KITE_API_SECRET` | optional | better to set them in the in-app Settings page |
+| Secret | `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` | optional | alerts (later tasks) |
+
+Generate a dedicated deploy key locally and add it:
+```bash
+ssh-keygen -t ed25519 -f deploy_key -N "" -C "github-deploy"
+# put the PUBLIC key on the VPS:
+ssh-copy-id -i deploy_key.pub trader@<VPS_HOST>     # or append deploy_key.pub to ~trader/.ssh/authorized_keys
+# add the PRIVATE key as the VPS_SSH_KEY secret:
+gh secret set VPS_SSH_KEY < deploy_key
+gh secret set VPS_HOST --body "<VPS_IP>"
+gh secret set VPS_USER --body "trader"
+rm deploy_key deploy_key.pub        # don't keep the private key around locally
+```
+
+### VPS prerequisites for the workflow
+1. **Repo already cloned** at `VPS_APP_DIR` with `origin` = this repo (do the one-time setup above once).
+2. **Node + npm + python3-venv + git** installed (the SPA is built on the VPS by `deploy.sh`).
+3. **Passwordless sudo** for the restart only — `sudo visudo -f /etc/sudoers.d/trade-engine`:
+   ```
+   trader ALL=(root) NOPASSWD: /usr/bin/systemctl restart api.service, /usr/bin/systemctl status api.service
+   ```
+   (`which systemctl` → adjust the path if it's `/bin/systemctl`.)
+4. `api.service` + Caddy installed once (first-time setup section above).
+
+After that, **merging to `main` deploys automatically**; check Actions → Deploy for logs.
