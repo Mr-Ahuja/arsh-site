@@ -1,127 +1,128 @@
-# Deployment Process — Arsh Studio
+# Deployment — Intraday Trade Engine on Hostinger VPS
 
-## Overview
-
-The site is a static HTML/CSS/JS project deployed to Hostinger shared hosting via FTP on every push. There are two active deployment branches:
-
-| Branch    | Purpose                        | Deploys to           |
-|-----------|--------------------------------|----------------------|
-| `main`    | Production — stable releases   | Hostinger (live)     |
-| `develop` | Active development / staging   | Hostinger (live)*    |
-
-> \* Both branches push to the same FTP target defined by `FTP_REMOTE_DIR`. When a separate staging environment is available, update `FTP_REMOTE_DIR` in the `develop` workflow step to point to a different path.
+> **Replaces** the previous static-site FTP runbook (obsolete). This product is a
+> long-running Python service, not static files — it requires a VPS, not shared hosting.
+> Companion to [architecture.md](architecture.md) §8.
 
 ---
 
-## Branch Strategy
+## 1. Topology
 
 ```
-main          ←── production, always stable
-  └── develop ←── all feature work lands here first
-        └── feature/<name>  (optional short-lived branches for large changes)
+Internet ──HTTPS/WSS──▶ Caddy (reverse proxy + auto-TLS) ──▶ FastAPI (api.service :8000)
+                                                          │
+                                                          ├──▶ Trade Engine (engine.service)
+                                                          │        ├─ Kite Ticker (WSS, outbound)
+                                                          │        ├─ Kite REST (orders/historical, outbound)
+                                                          │        └─ Telegram (outbound)
+                                                          └──▶ SQLite (WAL) on local disk
 ```
 
-- **Never push directly to `main`** unless you are doing an emergency hotfix.
-- All work is done on `develop` (or a `feature/*` branch cut from `develop`).
-- When `develop` is stable and tested, open a PR → `main` to promote to production.
+Two systemd-managed processes share one SQLite DB on the VPS local disk.
 
 ---
 
-## Cutting a Release Branch
+## 2. Prerequisites
+- Hostinger **VPS** plan (KVM), Ubuntu LTS, ≥1 vCPU / 1–2 GB RAM (SQLite + Python is light).
+- A **domain/subdomain** (e.g. `arsh.thechosenone.in`) pointed (A record) to the VPS IP.
+- **Zerodha Kite Connect** app (`api_key`, `api_secret`) with a **redirect URL** set to
+  `https://arsh.thechosenone.in/api/kite/callback`, and the **Historical Data** add-on.
+- A **Telegram bot** token + chat id.
 
-When you are ready to promote `develop` to `main`:
+---
+
+## 3. One-Time Server Setup
+```bash
+# system deps
+sudo apt update && sudo apt install -y python3-venv python3-pip git caddy ufw
+
+# firewall: only SSH + HTTPS (Caddy handles 80→443)
+sudo ufw allow OpenSSH && sudo ufw allow 80,443/tcp && sudo ufw enable
+
+# app user + code
+sudo useradd -r -m -d /opt/trade-engine trader
+sudo -u trader git clone <repo-url> /opt/trade-engine/app
+cd /opt/trade-engine/app
+sudo -u trader python3 -m venv .venv
+sudo -u trader .venv/bin/pip install -r requirements.txt
+```
+
+## 4. Secrets (never in the repo)
+`/opt/trade-engine/app/.env` (chmod 600, owned by `trader`):
+```
+KITE_API_KEY=...
+KITE_API_SECRET=...
+APP_SECRET=...                 # session/JWT signing
+DASHBOARD_PASSWORD_HASH=...    # argon2id hash (see §8 of architecture)
+KILL_TOKEN=...                 # pre-shared emergency kill-switch token
+TELEGRAM_BOT_TOKEN=...
+TELEGRAM_CHAT_ID=...
+DB_PATH=/opt/trade-engine/data/trade.db
+RISK_CONFIG=/opt/trade-engine/app/config/risk.yml
+```
+Sensitive at-rest values (e.g. stored daily token) are encrypted with a key derived from `APP_SECRET`.
+
+## 5. systemd Units
+`/etc/systemd/system/api.service`
+```ini
+[Unit]
+Description=Trade Engine API
+After=network-online.target
+[Service]
+User=trader
+WorkingDirectory=/opt/trade-engine/app
+EnvironmentFile=/opt/trade-engine/app/.env
+ExecStart=/opt/trade-engine/app/.venv/bin/uvicorn api.app:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+[Install]
+WantedBy=multi-user.target
+```
+`/etc/systemd/system/engine.service` — same pattern, `ExecStart=... -m engine.core.runner`.
+The engine runs continuously and **self-gates to market hours** (09:15–15:30 IST) internally,
+so it survives restarts without external cron. (Optional: a `systemd timer` can hard-stop it
+nightly to free resources.)
 
 ```bash
-# 1. Make sure develop is up to date and green
-git checkout develop
-git pull origin develop
-
-# 2. Open a PR on GitHub: develop → main
-gh pr create \
-  --base main \
-  --head develop \
-  --title "Release: <version or date>" \
-  --body "Describe what changed in this release."
-
-# 3. Review the PR diff, check GitHub Actions are green, then merge via GitHub UI
+sudo systemctl daemon-reload
+sudo systemctl enable --now api.service engine.service
 ```
 
-Do **not** fast-forward merge; use a merge commit so the release boundary is visible in `git log`.
-
----
-
-## Rollout Steps
-
-### Standard release (develop → main)
-
-1. Confirm the `develop` branch CI run is green (GitHub Actions tab).
-2. Visually review the live site on the staging path (if configured) or preview locally: `npx serve .`
-3. Open and merge the PR `develop → main` on GitHub.
-4. GitHub Actions automatically FTPs the build to Hostinger within ~60 seconds.
-5. Hard-refresh the live domain and smoke-test: nav, contact form, mobile layout.
-6. If anything is broken, revert immediately (see **Rollback** below).
-
-### Emergency hotfix (straight to main)
-
-```bash
-git checkout main
-git pull origin main
-git checkout -b hotfix/<short-description>
-# ... make the fix ...
-git add <files>
-git commit -m "fix: <description>"
-git push origin hotfix/<short-description>
-# Open PR → main, merge after review
-# Then back-merge into develop so it stays up to date:
-git checkout develop && git merge main && git push origin develop
+## 6. Reverse Proxy + TLS (Caddy)
+`/etc/caddy/Caddyfile`
 ```
-
----
-
-## Rollback
-
-The FTP deploy is a full mirror — there is no atomic swap. To roll back:
-
-1. Identify the last good commit on `main`:
-   ```bash
-   git log --oneline main
-   ```
-2. Create a revert commit (preferred — keeps history clean):
-   ```bash
-   git revert <bad-commit-sha>
-   git push origin main
-   ```
-3. GitHub Actions will re-deploy the reverted state automatically.
-
-Avoid `git reset --hard` on `main` unless absolutely necessary — it rewrites shared history.
-
----
-
-## GitHub Secrets Required
-
-| Secret            | Description                          |
-|-------------------|--------------------------------------|
-| `FTP_SERVER`      | Hostinger FTP hostname               |
-| `FTP_USERNAME`    | FTP account username                 |
-| `FTP_PASSWORD`    | FTP account password                 |
-| `FTP_REMOTE_DIR`  | Remote path on server (e.g. `public_html/`) |
-
-Add or rotate secrets at: **GitHub → Settings → Secrets and variables → Actions**
-
----
-
-## Local Development
-
-```bash
-# No build step — open directly or use a local server
-npx serve .
-# or
-python -m http.server 8080
+arsh.thechosenone.in {
+    reverse_proxy 127.0.0.1:8000
+    encode gzip
+}
 ```
+Caddy auto-provisions/renews Let's Encrypt TLS. WebSocket upgrades pass through automatically.
 
----
+## 7. Daily Operating Procedure
+1. **Morning (before 09:15 IST):** open `https://arsh.thechosenone.in`, log in, click
+   **"Login to Kite"** → complete Kite OAuth → engine stores the day's token + instruments dump.
+2. Select strategy + params + mode (**paper** until validated, then **live**); start.
+3. Engine trades the session; dashboard shows live cockpit; Telegram alerts on events.
+4. **15:15 IST:** forced square-off fires; EOD summary alert sent.
+5. Token expires overnight → repeat step 1 next trading day.
 
-## CI/CD Workflow File
+## 8. Backups
+- SQLite **WAL-safe** online backup nightly:
+  `sqlite3 $DB_PATH ".backup '/opt/trade-engine/backups/trade-$(date +%F).db'"`
+- Sync `backups/` off-box (e.g. rclone to object storage). Retain 30 days.
+- Tick archive can grow large → separate retention/rotation policy (see config-and-risk.md).
 
-`.github/workflows/deploy.yml` — triggers on push to `main` **and** `develop`.  
-Both branches share the same FTP credentials. Update `FTP_REMOTE_DIR` per-branch if separate environments are needed.
+## 9. Migrations & Releases
+- Schema changes via **Alembic**: `alembic upgrade head` on deploy.
+- Deploy = `git pull && pip install -r requirements.txt && alembic upgrade head && systemctl restart api engine`.
+- **Always restart during non-market hours.** A mid-session restart triggers the recovery
+  & reconciliation flow (see [execution-spec.md](execution-spec.md) §5) — safe, but avoid if possible.
+
+## 10. Rollback
+- `git checkout <last-good-sha>`, reinstall deps, `alembic downgrade` if schema changed, restart services.
+- Restore DB from the latest backup only if data corruption is suspected (you lose intra-day rows since backup).
+
+## 11. Monitoring & Health
+- `journalctl -u engine -f` / `-u api -f` for logs.
+- `/api/health` returns engine state, ticker connectivity, token validity, last tick age.
+- Telegram alerts on: ticker disconnect, token expiry, kill-switch, order errors, crash/restart.
