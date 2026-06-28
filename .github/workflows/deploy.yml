@@ -1,0 +1,49 @@
+name: Deploy to Hostinger
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── OPTION A: Shared Hosting via FTP ─────────────────────────────────
+      # Uncomment this block if your Hostinger plan is Shared Hosting.
+      # Add secrets: FTP_SERVER, FTP_USERNAME, FTP_PASSWORD, FTP_REMOTE_DIR
+      #
+      # - name: Deploy via FTP
+      #   uses: SamKirkland/FTP-Deploy-Action@v4.3.4
+      #   with:
+      #     server:     ${{ secrets.FTP_SERVER }}
+      #     username:   ${{ secrets.FTP_USERNAME }}
+      #     password:   ${{ secrets.FTP_PASSWORD }}
+      #     server-dir: ${{ secrets.FTP_REMOTE_DIR }}
+      #     exclude: |
+      #       **/.git*
+      #       **/.git*/**
+      #       .github/**
+
+      # ── OPTION B: VPS via SSH + rsync ────────────────────────────────────
+      # Uncomment this block if your Hostinger plan is a VPS.
+      # Add secrets: SSH_HOST, SSH_USER, SSH_PRIVATE_KEY, SSH_REMOTE_DIR
+      #
+      # - name: Deploy via rsync over SSH
+      #   uses: burnett01/rsync-deployments@7.0.1
+      #   with:
+      #     switches:    -avzr --delete --exclude='.git' --exclude='.github'
+      #     path:        ./
+      #     remote_path: ${{ secrets.SSH_REMOTE_DIR }}
+      #     remote_host: ${{ secrets.SSH_HOST }}
+      #     remote_user: ${{ secrets.SSH_USER }}
+      #     remote_key:  ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # ── PLACEHOLDER (remove once you activate A or B above) ──────────────
+      - name: Confirm deploy step
+        run: |
+          echo "Deploy workflow loaded. Activate Option A (FTP) or Option B (SSH) above."
+          echo "See README or project plan for secrets configuration."

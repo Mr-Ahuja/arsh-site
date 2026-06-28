@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LAXGAN — Studio</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav class="nav">
+    <a class="nav__logo" href="#">LAXGAN</a>
+    <button class="nav__toggle" id="navToggle" aria-label="Toggle menu">☰</button>
+    <ul class="nav__links" id="navLinks">
+      <li><a href="#work">Work</a></li>
+      <li><a href="#about">About</a></li>
+      <li><a href="#services">Services</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero__tag">EST. 2024 — DIGITAL STUDIO</div>
+    <h1 class="hero__headline">
+      WE BUILD<br />
+      THINGS<br />
+      THAT WORK.
+    </h1>
+    <p class="hero__sub">
+      Strategy. Design. Code. Delivered without fluff.
+    </p>
+    <a href="#work" class="btn">VIEW OUR WORK →</a>
+    <div class="hero__ticker">
+      <span>BRANDING &nbsp;/&nbsp; WEB DEV &nbsp;/&nbsp; PRODUCT DESIGN &nbsp;/&nbsp; CONSULTING &nbsp;/&nbsp; BRANDING &nbsp;/&nbsp; WEB DEV &nbsp;/&nbsp; PRODUCT DESIGN &nbsp;/&nbsp; CONSULTING &nbsp;/&nbsp;</span>
+    </div>
+  </section>
+
+  <!-- WORK GRID -->
+  <section class="section" id="work">
+    <div class="section__header">
+      <span class="section__num">01</span>
+      <h2>SELECTED WORK</h2>
+    </div>
+    <div class="grid">
+
+      <article class="card">
+        <div class="card__index">001</div>
+        <div class="card__img" style="background:#D4C9B8;">
+          <span class="card__label">BRAND IDENTITY</span>
+        </div>
+        <h3 class="card__title">NORTH SIGNAL CO.</h3>
+        <p class="card__desc">Complete rebrand for a logistics startup — wordmark, system, motion.</p>
+        <a href="#" class="card__link">VIEW PROJECT →</a>
+      </article>
+
+      <article class="card">
+        <div class="card__index">002</div>
+        <div class="card__img" style="background:#C4BBA8;">
+          <span class="card__label">WEB PLATFORM</span>
+        </div>
+        <h3 class="card__title">FRACTAL CMS</h3>
+        <p class="card__desc">Headless CMS with live preview built on Next.js and Sanity.io.</p>
+        <a href="#" class="card__link">VIEW PROJECT →</a>
+      </article>
+
+      <article class="card">
+        <div class="card__index">003</div>
+        <div class="card__img" style="background:#B8B0A0;">
+          <span class="card__label">PRODUCT DESIGN</span>
+        </div>
+        <h3 class="card__title">VOLT FINANCE</h3>
+        <p class="card__desc">End-to-end UX for a neo-banking app — 0 to launch in 6 months.</p>
+        <a href="#" class="card__link">VIEW PROJECT →</a>
+      </article>
+
+    </div>
+  </section>
+
+  <!-- ABOUT -->
+  <section class="section section--dark" id="about">
+    <div class="section__header">
+      <span class="section__num">02</span>
+      <h2>ABOUT</h2>
+    </div>
+    <div class="about">
+      <div class="about__text">
+        <p>
+          LAXGAN is an independent studio operating at the intersection of
+          brand strategy and technical execution. We work with founders,
+          product teams, and creative agencies who need work done — not
+          just presented.
+        </p>
+        <p>
+          No junior teams. No offshore handoffs. Every project is handled
+          directly by our core three-person crew.
+        </p>
+      </div>
+      <div class="about__stats">
+        <div class="stat">
+          <span class="stat__num">47</span>
+          <span class="stat__label">PROJECTS SHIPPED</span>
+        </div>
+        <div class="stat">
+          <span class="stat__num">6</span>
+          <span class="stat__label">YEARS ACTIVE</span>
+        </div>
+        <div class="stat">
+          <span class="stat__num">3</span>
+          <span class="stat__label">CORE TEAM</span>
+        </div>
+        <div class="stat">
+          <span class="stat__num">12</span>
+          <span class="stat__label">REPEAT CLIENTS</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SERVICES -->
+  <section class="section" id="services">
+    <div class="section__header">
+      <span class="section__num">03</span>
+      <h2>SERVICES</h2>
+    </div>
+    <div class="services">
+      <div class="service">
+        <span class="service__num">A</span>
+        <h3>BRAND STRATEGY</h3>
+        <p>Naming, positioning, visual identity, and guidelines that last.</p>
+      </div>
+      <div class="service">
+        <span class="service__num">B</span>
+        <h3>WEB DEVELOPMENT</h3>
+        <p>Static sites, SPAs, and full-stack builds with modern tooling.</p>
+      </div>
+      <div class="service">
+        <span class="service__num">C</span>
+        <h3>PRODUCT DESIGN</h3>
+        <p>UX audit, information architecture, prototyping, and handoff.</p>
+      </div>
+      <div class="service">
+        <span class="service__num">D</span>
+        <h3>CONSULTING</h3>
+        <p>Technical due-diligence, team scaling, and process architecture.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONTACT -->
+  <section class="section section--accent" id="contact">
+    <div class="section__header">
+      <span class="section__num">04</span>
+      <h2>CONTACT</h2>
+    </div>
+    <div class="contact">
+      <div class="contact__cta">
+        <p class="contact__big">HAVE A PROJECT?</p>
+        <p>We are currently taking on new clients for Q3 2026.</p>
+        <a href="mailto:hello@laxgan.com" class="btn btn--invert">hello@laxgan.com →</a>
+      </div>
+      <form class="form" onsubmit="handleSubmit(event)">
+        <div class="form__field">
+          <label for="name">NAME</label>
+          <input id="name" type="text" placeholder="Jane Doe" required />
+        </div>
+        <div class="form__field">
+          <label for="email">EMAIL</label>
+          <input id="email" type="email" placeholder="jane@company.com" required />
+        </div>
+        <div class="form__field">
+          <label for="message">MESSAGE</label>
+          <textarea id="message" rows="4" placeholder="Tell us about the project…" required></textarea>
+        </div>
+        <button type="submit" class="btn">SEND MESSAGE →</button>
+        <p class="form__confirm" id="formConfirm"></p>
+      </form>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer__left">
+      <span class="nav__logo">LAXGAN</span>
+      <span>© 2026 Laxgan Studio. All rights reserved.</span>
+    </div>
+    <div class="footer__right">
+      <a href="#">Twitter</a>
+      <a href="#">LinkedIn</a>
+      <a href="#">GitHub</a>
+    </div>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
