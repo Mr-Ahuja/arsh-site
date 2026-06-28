@@ -399,8 +399,10 @@ cd dashboard && npm run dev      # http://localhost:5173
 ```
 
 ### 4.10 CI + deployment
-- **Delete** the obsolete `.github/workflows/deploy.yml` (it FTPs the old static site).
-- Add `.github/workflows/ci.yml`: backend `ruff` + `mypy` + `pytest`; frontend `npm ci && npm run build`.
+- **Ensure** the obsolete `.github/workflows/deploy.yml` is absent (already removed in repo cleanup).
+- `.github/workflows/ci.yml` exists with **guarded** jobs (skip when code is absent); as Task 01
+  lands code they activate: backend `ruff` + `mypy` + `pytest`; frontend `npm ci && npm run build`.
+  Remove the guards (make steps unconditional) once the backend/frontend exist.
 - **VPS deploy** follows [../deployment.md](../deployment.md): clone, venv, `alembic upgrade head`,
   build frontend, `api.service` via systemd, Caddy TLS. (Full VPS deploy automation = Task 13;
   Task 1 just needs it running behind Caddy with the real Redirect URL set.)

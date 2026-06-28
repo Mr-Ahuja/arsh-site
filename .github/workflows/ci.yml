@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+# Guarded jobs: they pass on the docs-only repo today and automatically start doing real
+# work as Task 01 lands the backend (pyproject.toml/requirements.txt) and frontend
+# (dashboard/package.json). Once those exist, drop the `if [ -f ... ]` guards to make the
+# steps unconditional (see docs/implementation/task-01-baseline-and-auth.md §4.10).
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Lint, type-check & test
+        run: |
+          if [ -f pyproject.toml ] || [ -f requirements.txt ]; then
+            python -m pip install --upgrade pip
+            if [ -f pyproject.toml ]; then pip install -e ".[dev]"; else pip install -r requirements.txt; fi
+            ruff check .
+            mypy .
+            pytest -q
+          else
+            echo "No backend yet — skipping (Task 01 adds it)."
+          fi
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: Install & build
+        run: |
+          if [ -f dashboard/package.json ]; then
+            cd dashboard
+            npm ci
+            npm run build
+          else
+            echo "No frontend yet — skipping (Task 01 adds it)."
+          fi
