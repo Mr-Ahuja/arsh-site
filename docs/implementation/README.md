@@ -55,7 +55,7 @@ Parent specs: [../requirements.md](../requirements.md) · [../architecture.md](.
 
 | # | Task | Outcome | Status |
 |---|------|---------|--------|
-| **01** | **Baseline structuring, deployment & auth** | Monorepo skeleton, shared kernel, App login (static) + Zerodha login/token, Kite-styled UI shell, deployable | ✅ **detailed → [task-01-baseline-and-auth.md](task-01-baseline-and-auth.md)** |
+| **01** | **Baseline structuring, deployment & auth** | Monorepo skeleton, shared kernel, App login (static) + Settings page (Kite api_key/secret) + Zerodha login/token, Kite-styled UI shell, deployable | ✅ **detailed → [task-01-baseline-and-auth.md](task-01-baseline-and-auth.md)** |
 | 02 | Persistence & DAL | Full DB schema + repositories + migrations | planned |
 | 03 | Kite data layer | Instruments dump, KiteTicker WS, candle aggregator, rolling buffer, tick archive | planned |
 | 04 | Strategy framework | `BaseStrategy`, `Position`/`pos.vars`, indicators, loader, param validation | planned |

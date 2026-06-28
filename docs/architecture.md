@@ -138,6 +138,7 @@ silently swallowed (NFR-3).
 | `equity` | equity/P&L time series for the curve |
 | `events` | system log (connects, errors, kill-switch, token expiry) |
 | `kite_session` | current day's access token + instruments dump metadata |
+| `settings` | encrypted key-value config (Kite `api_key`/`api_secret` set via Settings UI, …) |
 | `backtests` | backtest run config + summary metrics |
 
 Access only through `db/dal.py` so a future Postgres/TimescaleDB swap is localized.
@@ -172,9 +173,10 @@ static assets and served by FastAPI (one deployable). Charts via **lightweight-c
   expired (true emergency stop). Rate-limited and logged.
 - **Kite OAuth (semi-auto):** dashboard button → Kite redirect → callback stores the **day's
   access token** in `kite_session` (encrypted at rest). **No TOTP secret stored.**
-- **Secrets** (`api_key`, `api_secret`, Telegram token, `APP_SECRET`, `KILL_TOKEN`) live in
-  `.env` / VPS environment, **never in the repo**; sensitive at-rest values encrypted with a
-  key derived from `APP_SECRET`.
+- **Secrets** (`APP_SECRET`, `KILL_TOKEN`, Telegram token) live in `.env` / VPS environment,
+  **never in the repo**. **Kite `api_key`/`api_secret`** are entered via the **Settings UI** and
+  stored **encrypted in the `settings` table** (Fernet, key derived from `APP_SECRET`), with
+  `.env` as an optional bootstrap. The api_secret is write-only — never returned to the browser.
 - All control + auth events are audited to the `events` table.
 
 ## 7a. SQLite Concurrency & Durability

@@ -14,11 +14,13 @@
 **In scope**
 - Monorepo restructure + shared kernel (`core/`, `db/`, `integrations/`, `services/`, `api/`, `dashboard/`).
 - Archive the old static site; replace the obsolete FTP CI.
-- DB bootstrap (Alembic) with the two tables Task 1 needs: `kite_session`, `events`.
+- DB bootstrap (Alembic) with the three tables Task 1 needs: `kite_session`, `events`, `settings`.
 - App auth: login/logout/me, JWT cookie, CSRF, login throttling, `current_user` dep.
+- **Settings: a UI section to enter/update the Zerodha `api_key` & `api_secret`** (stored
+  encrypted in the DB), so credentials never require server file access to change.
 - Kite auth: login-URL, OAuth callback (request_token→access_token), status, postback stub.
 - Frontend: Vite+React+TS+Tailwind, Zerodha theme tokens, `AuthLayout`/`AppLayout`,
-  App-login page, Kite-connect screen, `ProtectedRoute`, shared `api.ts` + `authStore`.
+  App-login page, **Settings page**, Kite-connect screen, `ProtectedRoute`, shared `api.ts` + `authStore`.
 - One-command local run + serve frontend from FastAPI; VPS deploy per [../deployment.md](../deployment.md).
 
 **Out of scope** (later tasks): ticker/market data, strategy framework, brokers/engine,
@@ -118,8 +120,10 @@ APP_SECRET=change-me-long-random
 KILL_TOKEN=change-me-random
 APP_USERNAME=mrahuja
 APP_PASSWORD_HASH=<paste argon2 hash of UseLess@420>
-KITE_API_KEY=<from kite console>
-KITE_API_SECRET=<from kite console>
+# Kite credentials are OPTIONAL here — they bootstrap the DB on first run.
+# Preferred: leave blank and enter them in the in-app Settings page (stored encrypted in DB).
+KITE_API_KEY=
+KITE_API_SECRET=
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_CHAT_ID=
 ```
@@ -199,10 +203,16 @@ class Event(Base):                 # audit log
     __tablename__ = "events"
     id: Mapped[int] = mapped_column(primary_key=True)
     ts: Mapped[datetime]; level: Mapped[str]; kind: Mapped[str]; message: Mapped[str]
+
+class Setting(Base):               # encrypted key-value config (Kite api_key/secret, …)
+    __tablename__ = "settings"
+    key: Mapped[str] = mapped_column(primary_key=True)   # e.g. "kite_api_key", "kite_api_secret"
+    value_enc: Mapped[str]                                # Fernet-encrypted (core.crypto)
+    updated_at: Mapped[datetime]
 ```
 ```bash
 alembic init -t async db/migrations          # configure env.py to import Base + settings
-alembic revision --autogenerate -m "task01: kite_session, events"
+alembic revision --autogenerate -m "task01: kite_session, events, settings"
 alembic upgrade head
 ```
 
@@ -210,20 +220,31 @@ alembic upgrade head
 `client.py` — `KiteClientWrapper` holding a `KiteConnect(api_key)` and (when available) the
 access token; single shared instance via `get_kite()`.
 
-`auth.py` — the OAuth flow:
+`credentials.py` — **single source of truth** for the api_key/secret, DB-first with `.env`
+bootstrap fallback (so both the Settings UI and env work):
+```python
+async def get_kite_credentials(session) -> tuple[str, str]:
+    s = get_settings()
+    api_key    = await settings_service.get(session, "kite_api_key")    or s.kite_api_key
+    api_secret = await settings_service.get(session, "kite_api_secret") or s.kite_api_secret
+    if not api_key or not api_secret:
+        raise KiteError("Kite API key/secret not configured — set them in Settings")
+    return api_key, api_secret
+```
+
+`auth.py` — the OAuth flow (credentials resolved via `credentials.py`):
 ```python
 from kiteconnect import KiteConnect
-from core.config import get_settings
 from core.crypto import encrypt
 
-def login_url() -> str:
-    s = get_settings()
-    return KiteConnect(api_key=s.kite_api_key).login_url()   # kite.zerodha.com/connect/login?...
+async def login_url(session) -> str:
+    api_key, _ = await get_kite_credentials(session)
+    return KiteConnect(api_key=api_key).login_url()         # kite.zerodha.com/connect/login?...
 
-def exchange(request_token: str) -> dict:
-    s = get_settings()
-    kite = KiteConnect(api_key=s.kite_api_key)
-    data = kite.generate_session(request_token, api_secret=s.kite_api_secret)
+async def exchange(session, request_token: str) -> dict:
+    api_key, api_secret = await get_kite_credentials(session)
+    kite = KiteConnect(api_key=api_key)
+    data = kite.generate_session(request_token, api_secret=api_secret)
     # data has: access_token, public_token, user_id, ...
     return data
 ```
@@ -231,6 +252,7 @@ def exchange(request_token: str) -> dict:
 > api_secret)` internally. Persist `data["access_token"]` **encrypted** (`core.crypto.encrypt`)
 > into `kite_session` with today's IST date + `user_id`. Set it on the shared client
 > (`kite.set_access_token(...)`) so later API calls are authenticated.
+> The **api_secret is write-only**: stored encrypted, never returned to the browser.
 
 ### 4.7 API layer — `api/`
 `api/app.py` — app factory: CORS (dev), exception handlers, routers, mount the built SPA:
@@ -238,9 +260,10 @@ def exchange(request_token: str) -> dict:
 def create_app() -> FastAPI:
     app = FastAPI(title="Trade Engine")
     register_error_handlers(app)
-    app.include_router(health.router, prefix="/api")
-    app.include_router(auth.router,   prefix="/api/auth")
-    app.include_router(kite.router,   prefix="/api/kite")
+    app.include_router(health.router,   prefix="/api")
+    app.include_router(auth.router,     prefix="/api/auth")
+    app.include_router(settings.router, prefix="/api/settings")
+    app.include_router(kite.router,     prefix="/api/kite")
     # serve built SPA + client-side routing fallback
     app.mount("/", SPAStaticFiles(directory="dashboard/dist", html=True), name="spa")
     return app
@@ -294,6 +317,37 @@ async def kite_postback(request: Request):
     # TODO(Task07): verify checksum SHA-256(order_id+order_timestamp+api_secret); enqueue update
     log.info("kite_postback", payload=payload); return {"ok": True}
 ```
+`services/settings_service.py` — encrypted key-value accessor (reused by routes + kite):
+```python
+async def get(session, key: str) -> str | None:
+    row = await repo.get(session, key)
+    return decrypt(row.value_enc, get_settings().app_secret) if row else None
+
+async def set(session, key: str, value: str) -> None:
+    await repo.upsert(session, key=key, value_enc=encrypt(value, get_settings().app_secret))
+```
+
+`api/routes/settings.py` — the Settings UI backend (**api_secret never returned**):
+```python
+@router.get("")                                       # masked read for the form
+async def read(session=Depends(get_session), user=Depends(current_user)):
+    api_key = await settings_service.get(session, "kite_api_key")
+    has_secret = bool(await settings_service.get(session, "kite_api_secret"))
+    return ApiResponse(data={"kite_api_key": api_key or "", "kite_api_secret_set": has_secret})
+
+@router.put("")                                       # csrf-protected write
+async def update(body: KiteCredsIn, session=Depends(get_session),
+                 user=Depends(current_user), _=Depends(require_csrf)):
+    await settings_service.set(session, "kite_api_key", body.api_key)
+    if body.api_secret:                               # only overwrite secret when provided
+        await settings_service.set(session, "kite_api_secret", body.api_secret)
+    await session.commit()
+    return ApiResponse(data={"saved": True})
+```
+> **LLD:** the GET returns the api_key (low sensitivity) but **never the secret** — only a
+> `kite_api_secret_set` boolean. The PUT overwrites the secret only when a non-empty value is
+> sent, so re-saving the form without retyping the secret keeps the existing one.
+
 `api/routes/health.py` → `{status, kite_connected, env}`. `api/deps.py` centralizes
 `Depends` (`get_session`, `current_user`, `require_csrf`, `get_settings`).
 
@@ -312,10 +366,15 @@ npm i -D tailwindcss postcss autoprefixer && npx tailwindcss init -p
 - `src/layouts/AuthLayout.tsx` — centered Kite-blue card. `AppLayout.tsx` — top nav (logo,
   placeholder links Cockpit/History/Analytics/Backtest, **Kite status pill**, Logout).
 - `src/features/auth/LoginPage.tsx` — username/password form → `authStore.login`.
+- `src/features/settings/SettingsPage.tsx` — **Zerodha API credentials form**: `GET /settings`
+  to prefill `api_key` and show "secret is set ✓"; `PUT /settings` to save. Secret field is a
+  password input, left blank unless changing. Shows the exact **Redirect/Postback URLs** to copy
+  into the Kite console. Reachable from an AppLayout nav link **and** prompted automatically when
+  credentials are missing.
 - `src/features/auth/KiteConnect.tsx` — reads `/kite/status`; **"Login to Kite"** button →
   `GET /kite/login-url` then `window.location.href = url`; shows "Connected as <user_id>" when
-  back with `?kite=connected`.
-- `src/App.tsx` routes: `/login` (public) · `/` & `/connect` (ProtectedRoute → AppLayout).
+  back with `?kite=connected`. If credentials aren't set, the button is disabled with a link to Settings.
+- `src/App.tsx` routes: `/login` (public) · `/`, `/settings`, `/connect` (ProtectedRoute → AppLayout).
 - `vite.config.ts` dev proxy: `/api → http://127.0.0.1:8000`.
 
 > **Login look (Zerodha):** white card, Inter font, Kite-blue primary button, thin borders,
@@ -342,9 +401,11 @@ cd dashboard && npm run dev      # http://localhost:5173
 ## 5. Definition of Done
 - [ ] Repo restructured; old static site in `archive/legacy-site/`; FTP workflow removed.
 - [ ] `.env.example` committed; `.env` gitignored; `APP_PASSWORD_HASH` generated for `UseLess@420`.
-- [ ] `alembic upgrade head` creates `kite_session` + `events` (WAL enabled).
+- [ ] `alembic upgrade head` creates `kite_session` + `events` + `settings` (WAL enabled).
 - [ ] Shared kernel (`core/*`) + `db/{base,repository,models}` + `BaseRepository` in place.
 - [ ] App login works: bad creds rejected + throttled; good creds set HttpOnly+CSRF cookies; `/me` returns user; logout clears.
+- [ ] **Settings page** saves Kite `api_key`/`api_secret` (encrypted in DB); GET never returns
+      the secret; saved key/secret drive the Kite login (DB-first, `.env` fallback).
 - [ ] Kite login works end-to-end: button → Zerodha login → callback exchanges token →
       encrypted token stored → `/kite/status` shows connected.
 - [ ] `/api/kite/postback` stub returns 200 and logs payload.
@@ -355,14 +416,19 @@ cd dashboard && npm run dev      # http://localhost:5173
 1. `python scripts/hash_password.py 'UseLess@420'` → paste into `.env`.
 2. Start backend + frontend. Visit `/login`, enter `mrahuja` / `UseLess@420` → land on dashboard.
    Try a wrong password 5× → locked out (verify 403/lockout message).
-3. Click **Login to Kite** → complete Zerodha login → you return to `/?kite=connected`;
+3. Open **Settings** → paste your Kite `api_key` + `api_secret` → Save. Reload: key is prefilled,
+   secret shows "set ✓" (and is **not** present in the `/api/settings` response body).
+4. Click **Login to Kite** → complete Zerodha login → you return to `/?kite=connected`;
    the nav **Kite status pill** shows connected; `GET /api/kite/status` → `connected:true` with `valid_for_date` = today.
-4. `curl -X POST localhost:8000/api/kite/postback -d '{}' -H 'content-type: application/json'` → `{"ok":true}` and an `events`/log line.
-5. Restart backend → `/me` still works within 8h (JWT cookie); Kite stays connected for today's date.
+5. `curl -X POST localhost:8000/api/kite/postback -d '{}' -H 'content-type: application/json'` → `{"ok":true}` and an `events`/log line.
+6. Restart backend → `/me` still works within 8h (JWT cookie); Kite stays connected for today's date.
 
 ## 7. Tests to write (pytest)
 - `verify_password` true/false; `issue_jwt`/`current_user` round-trip; expired/invalid token → 401.
 - `/auth/login` happy + wrong-password + lockout-after-5.
 - CSRF: mutating call without `X-CSRF-Token` → 403.
+- `PUT /settings` then `GET /settings`: api_key round-trips, secret is **never** in the response
+  (`kite_api_secret_set:true`); re-saving without a secret keeps the old one.
+- `get_kite_credentials` prefers DB values over `.env`, and raises `KiteError` when neither set.
 - `/kite/callback` with a mocked `exchange()` stores an (encrypted) session row; `/kite/status` reflects it.
 - `crypto.encrypt/decrypt` round-trip.
