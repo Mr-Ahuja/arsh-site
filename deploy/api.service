@@ -1,0 +1,19 @@
+[Unit]
+Description=Trade Engine API
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=trader
+Group=trader
+WorkingDirectory=/opt/trade-engine/app
+EnvironmentFile=/opt/trade-engine/app/.env
+ExecStart=/opt/trade-engine/app/.venv/bin/uvicorn api.app:app --host 127.0.0.1 --port 8000
+Restart=always
+RestartSec=3
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
