@@ -24,9 +24,9 @@ Two systemd-managed processes share one SQLite DB on the VPS local disk.
 
 ## 2. Prerequisites
 - Hostinger **VPS** plan (KVM), Ubuntu LTS, ≥1 vCPU / 1–2 GB RAM (SQLite + Python is light).
-- A **domain/subdomain** (e.g. `trade.example.com`) pointed (A record) to the VPS IP.
+- A **domain/subdomain** (e.g. `arsh.thechosenone.in`) pointed (A record) to the VPS IP.
 - **Zerodha Kite Connect** app (`api_key`, `api_secret`) with a **redirect URL** set to
-  `https://trade.example.com/api/kite/callback`, and the **Historical Data** add-on.
+  `https://arsh.thechosenone.in/api/kite/callback`, and the **Historical Data** add-on.
 - A **Telegram bot** token + chat id.
 
 ---
@@ -91,7 +91,7 @@ sudo systemctl enable --now api.service engine.service
 ## 6. Reverse Proxy + TLS (Caddy)
 `/etc/caddy/Caddyfile`
 ```
-trade.example.com {
+arsh.thechosenone.in {
     reverse_proxy 127.0.0.1:8000
     encode gzip
 }
@@ -99,7 +99,7 @@ trade.example.com {
 Caddy auto-provisions/renews Let's Encrypt TLS. WebSocket upgrades pass through automatically.
 
 ## 7. Daily Operating Procedure
-1. **Morning (before 09:15 IST):** open `https://trade.example.com`, log in, click
+1. **Morning (before 09:15 IST):** open `https://arsh.thechosenone.in`, log in, click
    **"Login to Kite"** → complete Kite OAuth → engine stores the day's token + instruments dump.
 2. Select strategy + params + mode (**paper** until validated, then **live**); start.
 3. Engine trades the session; dashboard shows live cockpit; Telegram alerts on events.

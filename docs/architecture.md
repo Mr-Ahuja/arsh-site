@@ -151,9 +151,10 @@ Access only through `db/dal.py` so a future Postgres/TimescaleDB swap is localiz
 - Frontend renders a **Zerodha Kite-style** UI (light theme, Kite-blue `#387ED1`,
   dense tables, compact P&L tiles).
 
-**Frontend framework — recommendation:** a lightweight SPA (Vue or React + Vite) served
-as static files by FastAPI, with a charting lib (e.g. lightweight-charts / ECharts) for
-equity & candles. *Open item — to confirm in build phase.*
+**Frontend framework — LOCKED:** **React 18 + TypeScript + Vite + Tailwind** SPA, built to
+static assets and served by FastAPI (one deployable). Charts via **lightweight-charts**
+(TradingView). Chosen for maximum component reuse — see
+[implementation/code-reuse-strategy.md](implementation/code-reuse-strategy.md).
 
 ---
 

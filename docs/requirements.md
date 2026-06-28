@@ -197,8 +197,6 @@ See **[strategy-framework.md](strategy-framework.md)** for the full contract.
 
 ## 8. Open Items / To Confirm Later
 - Project / product **name & branding**.
-- **Frontend framework** for the dashboard (architecture §6 recommends Vue/React + Vite) — confirm.
-- Whether to keep the old static marketing site anywhere (currently slated for archival).
 - Final **VPS plan & domain** (deployment doc has the full runbook; just need the concrete values).
 
 ### Resolved since baseline
@@ -208,6 +206,8 @@ See **[strategy-framework.md](strategy-framework.md)** for the full contract.
 - ✅ **Strategy contracts** (types/exceptions/timeouts/validation/trust) → strategy-framework.md §11.
 - ✅ **SQLite concurrency, auth hardening, latency definition** → [architecture.md](architecture.md) §7/§7a, NFR-1.
 - ✅ **VPS deployment runbook** — [deployment.md](deployment.md) rewritten (was obsolete static-site FTP).
+- ✅ **Frontend framework** — locked to React + TS + Vite + Tailwind ([implementation/code-reuse-strategy.md](implementation/code-reuse-strategy.md)).
+- ✅ **Implementation plan** — task breakdown in [implementation/](implementation/README.md); Task 01 detailed.
 
 ## 9. Document Map
 | Doc | Scope |
