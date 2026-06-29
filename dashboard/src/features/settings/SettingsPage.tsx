@@ -113,7 +113,11 @@ export function SettingsPage() {
     setTgError(null);
     setTgTestBusy(true);
     try {
-      await apiPost("/settings/telegram/test", {});
+      // Pass form values if filled so the user can test before saving.
+      await apiPost("/settings/telegram/test", {
+        bot_token: tgToken || undefined,
+        chat_id: tgChatId || undefined,
+      });
       setTgStatus("Test message sent — check your Telegram.");
     } catch (err) {
       setTgError((err as ApiError).message ?? "Test failed");
@@ -122,7 +126,10 @@ export function SettingsPage() {
     }
   }
 
-  const tgFullyConfigured = data?.telegram_bot_token_set && !!data?.telegram_chat_id;
+  // Enabled when form has both values filled, OR when the DB already has both stored.
+  const tgCanTest =
+    (!!tgToken && !!tgChatId) ||
+    (data?.telegram_bot_token_set && !!data?.telegram_chat_id);
 
   if (isLoading) return <p className="text-xs text-ink-muted">Loading…</p>;
 
@@ -218,9 +225,9 @@ export function SettingsPage() {
             <Button
               type="button"
               variant="ghost"
-              disabled={!tgFullyConfigured || tgTestBusy}
+              disabled={!tgCanTest || tgTestBusy}
               onClick={onTelegramTest}
-              title={!tgFullyConfigured ? "Configure bot token and chat ID first" : undefined}
+              title={!tgCanTest ? "Fill in bot token and chat ID to test" : undefined}
             >
               {tgTestBusy ? "Sending…" : "Send test"}
             </Button>

@@ -18,3 +18,8 @@ class KiteCredsIn(BaseModel):
 class TelegramIn(BaseModel):
     bot_token: str | None = None  # only overwrite when provided
     chat_id: str | None = None
+
+
+class TelegramTestIn(BaseModel):
+    bot_token: str | None = None  # if provided, use directly (don't require DB entry)
+    chat_id: str | None = None

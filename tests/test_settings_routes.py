@@ -92,9 +92,16 @@ def test_telegram_put_requires_csrf(auth_client):
     assert resp.status_code == 403
 
 
-def test_telegram_test_requires_config(auth_client):
+def test_telegram_test_requires_config_when_no_inline_creds(auth_client):
+    # No DB config and no inline credentials → 422.
     resp = auth_client.post(
         "/api/settings/telegram/test",
+        json={},
         headers=_csrf(auth_client),
     )
     assert resp.status_code == 422
+
+
+def test_telegram_test_requires_csrf(auth_client):
+    resp = auth_client.post("/api/settings/telegram/test", json={})
+    assert resp.status_code == 403

@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.schemas import KiteCredsIn, TelegramIn
+from api.schemas import KiteCredsIn, TelegramIn, TelegramTestIn
 from core.config import get_settings
 from core.errors import ValidationError as AppValidationError
 from core.schemas import ApiResponse
@@ -70,13 +70,15 @@ async def update_telegram(
 
 @router.post("/telegram/test")
 async def test_telegram(
+    body: TelegramTestIn,
     session: AsyncSession = Depends(get_session),
     user: str = Depends(current_user),
     _: None = Depends(require_csrf),
 ) -> ApiResponse:
-    bot_token = await settings_service.get(session, "telegram_bot_token")
-    chat_id = await settings_service.get(session, "telegram_chat_id")
+    # Prefer inline credentials (unsaved test); fall back to DB-stored values.
+    bot_token = body.bot_token or await settings_service.get(session, "telegram_bot_token")
+    chat_id = body.chat_id or await settings_service.get(session, "telegram_chat_id")
     if not bot_token or not chat_id:
-        raise AppValidationError("Telegram bot token and chat ID must be configured first.")
+        raise AppValidationError("Provide bot token and chat ID, or save them in Settings first.")
     await send_message(bot_token, chat_id, "Test message from Trade Engine — configuration is working.")
     return ApiResponse(data={"sent": True})
