@@ -42,3 +42,59 @@ def test_resaving_without_secret_keeps_existing(auth_client):
 def test_put_settings_requires_csrf(auth_client):
     resp = auth_client.put("/api/settings", json={"api_key": "x"})
     assert resp.status_code == 403
+
+
+# --- Telegram settings ---
+
+def test_get_settings_includes_telegram_fields(auth_client):
+    got = auth_client.get("/api/settings").json()["data"]
+    assert "telegram_bot_token_set" in got
+    assert "telegram_chat_id" in got
+    assert got["telegram_bot_token_set"] is False
+    assert got["telegram_chat_id"] == ""
+
+
+def test_telegram_roundtrip_token_never_returned(auth_client):
+    resp = auth_client.put(
+        "/api/settings/telegram",
+        json={"bot_token": "9999:AAAA_secret_token", "chat_id": "-100123456"},
+        headers=_csrf(auth_client),
+    )
+    assert resp.status_code == 200
+
+    got = auth_client.get("/api/settings").json()["data"]
+    assert got["telegram_bot_token_set"] is True
+    assert got["telegram_chat_id"] == "-100123456"
+    # Token must NEVER appear anywhere in any response.
+    assert "AAAA_secret_token" not in resp.text
+    assert "bot_token" not in got
+
+
+def test_telegram_resave_without_token_keeps_existing(auth_client):
+    auth_client.put(
+        "/api/settings/telegram",
+        json={"bot_token": "9999:original_token", "chat_id": "-100111"},
+        headers=_csrf(auth_client),
+    )
+    # Update chat_id only — token should survive.
+    auth_client.put(
+        "/api/settings/telegram",
+        json={"chat_id": "-100999"},
+        headers=_csrf(auth_client),
+    )
+    got = auth_client.get("/api/settings").json()["data"]
+    assert got["telegram_bot_token_set"] is True
+    assert got["telegram_chat_id"] == "-100999"
+
+
+def test_telegram_put_requires_csrf(auth_client):
+    resp = auth_client.put("/api/settings/telegram", json={"chat_id": "x"})
+    assert resp.status_code == 403
+
+
+def test_telegram_test_requires_config(auth_client):
+    resp = auth_client.post(
+        "/api/settings/telegram/test",
+        headers=_csrf(auth_client),
+    )
+    assert resp.status_code == 422

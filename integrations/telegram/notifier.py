@@ -20,15 +20,21 @@ class Notifier(Protocol):
     async def send(self, message: str) -> None: ...
 
 
+async def send_message(bot_token: str, chat_id: str, text: str) -> None:
+    """Low-level Telegram send — caller provides credentials."""
+    url = f"https://api.telegram.org/bot{bot_token}/sendMessage"
+    async with httpx.AsyncClient(timeout=10) as client:
+        r = await client.post(url, json={"chat_id": chat_id, "text": text})
+        r.raise_for_status()
+
+
 class TelegramNotifier:
     async def send(self, message: str) -> None:
         s = get_settings()
         if not s.telegram_bot_token or not s.telegram_chat_id:
             log.info("telegram_skip", reason="not configured", message=message)
             return
-        url = f"https://api.telegram.org/bot{s.telegram_bot_token}/sendMessage"
-        async with httpx.AsyncClient(timeout=10) as client:
-            await client.post(url, json={"chat_id": s.telegram_chat_id, "text": message})
+        await send_message(s.telegram_bot_token, s.telegram_chat_id, message)
 
 
 def get_notifier() -> Notifier:

@@ -13,3 +13,8 @@ class LoginIn(BaseModel):
 class KiteCredsIn(BaseModel):
     api_key: str
     api_secret: str | None = None  # only overwrite when provided
+
+
+class TelegramIn(BaseModel):
+    bot_token: str | None = None  # only overwrite when provided
+    chat_id: str | None = None
