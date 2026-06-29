@@ -33,39 +33,43 @@ export function KiteConnect() {
   }
 
   return (
-    <div className="max-w-xl">
-      <Card>
-        <h1 className="mb-1 text-lg font-semibold">Connect Zerodha Kite</h1>
-        <p className="mb-4 text-sm text-ink-muted">
-          Log in each trading morning to mint the day's access token.
-        </p>
+    <div className="mx-auto max-w-xl space-y-4">
+      <h1 className="text-base font-semibold text-ink">Kite connection</h1>
 
+      <Card>
         {justConnected && (
-          <p className="mb-3">
-            <Badge tone="green">Kite connected ✓</Badge>
-          </p>
+          <div className="mb-3">
+            <Badge tone="pos" dot>
+              Connected successfully
+            </Badge>
+          </div>
         )}
 
         {isLoading ? (
-          <p className="text-ink-muted">Checking status…</p>
+          <p className="text-xs text-ink-muted">Checking status…</p>
         ) : status?.connected ? (
-          <div className="space-y-2">
-            <Badge tone="green">Connected as {status.user_id}</Badge>
-            <p className="text-sm text-ink-muted">Valid for {status.valid_for_date}</p>
+          <div className="space-y-1.5">
+            <Badge tone="pos" dot>
+              Connected as {status.user_id}
+            </Badge>
+            <p className="num text-xs text-ink-muted">Token valid for {status.valid_for_date}</p>
           </div>
         ) : (
           <div className="space-y-3">
+            <p className="text-xs text-ink-muted">
+              Log in each trading morning to mint the day&apos;s access token. It expires overnight.
+            </p>
             <Button onClick={loginToKite}>Login to Kite</Button>
-            <p className="text-sm text-ink-muted">
+            <p className="text-2xs text-ink-muted">
               Credentials not set?{" "}
-              <Link to="/settings" className="text-kite-blue">
+              <Link to="/settings" className="text-brand">
                 Configure them in Settings
               </Link>
               .
             </p>
           </div>
         )}
-        {error && <p className="mt-3 text-sm text-kite-red">{error}</p>}
+        {error && <p className="mt-3 text-xs text-neg">{error}</p>}
       </Card>
     </div>
   );

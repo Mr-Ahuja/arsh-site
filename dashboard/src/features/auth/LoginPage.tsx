@@ -2,7 +2,6 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "../../stores/authStore";
 import { AuthLayout } from "../../layouts/AuthLayout";
-import { Card } from "../../components/ui/Card";
 import { Input } from "../../components/ui/Input";
 import { Button } from "../../components/ui/Button";
 import type { ApiError } from "../../lib/api";
@@ -31,14 +30,16 @@ export function LoginPage() {
 
   return (
     <AuthLayout>
-      <Card>
-        <h1 className="mb-4 text-lg font-semibold">Sign in</h1>
-        <form onSubmit={onSubmit} className="space-y-4">
+      <div className="rounded-md border border-line bg-surface px-6 py-7 shadow-sm">
+        <h1 className="text-base font-semibold text-ink">Login to your account</h1>
+        <p className="mb-5 mt-1 text-xs text-ink-muted">Trade engine control panel</p>
+        <form onSubmit={onSubmit} className="space-y-3.5">
           <Input
             label="Username"
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             autoComplete="username"
+            autoFocus
             required
           />
           <Input
@@ -49,12 +50,19 @@ export function LoginPage() {
             autoComplete="current-password"
             required
           />
-          {error && <p className="text-sm text-kite-red">{error}</p>}
+          {error && (
+            <p className="rounded border border-neg/30 bg-neg-bg px-2.5 py-1.5 text-xs text-neg">
+              {error}
+            </p>
+          )}
           <Button type="submit" className="w-full" disabled={busy}>
-            {busy ? "Signing in…" : "Sign in"}
+            {busy ? "Signing in…" : "Login"}
           </Button>
         </form>
-      </Card>
+      </div>
+      <p className="mt-4 text-center text-2xs text-ink-muted">
+        Single-user access · sessions expire after 8 hours
+      </p>
     </AuthLayout>
   );
 }
