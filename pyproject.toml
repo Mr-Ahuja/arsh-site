@@ -34,7 +34,13 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["core", "db", "integrations", "services", "api", "engine", "strategies"]
+packages = [
+    "core", "db", "db.repositories",
+    "integrations", "integrations.kite", "integrations.telegram",
+    "services", "api", "api.routes",
+    "engine", "engine.data",
+    "strategies",
+]
 
 [tool.ruff]
 line-length = 100
