@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     telegram_bot_token: str | None = None
     telegram_chat_id: str | None = None
 
+    # ── Data layer (Task 03) ──────────────────────────────────────────────────
+    tick_archive_batch_size: int = 100        # flush tick buffer every N ticks
+    tick_archive_flush_interval: float = 10.0 # … or every N seconds
+    rolling_buffer_candles: int = 500         # in-memory candle lookback window
+    rolling_buffer_ticks: int = 1000          # in-memory tick lookback window
+
     @property
     def cookie_secure(self) -> bool:
         """Secure cookies everywhere except local dev over http."""
