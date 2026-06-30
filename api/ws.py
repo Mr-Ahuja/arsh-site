@@ -1,7 +1,8 @@
 """WebSocket endpoint — authenticated live event stream to the browser.
 
-Authentication: the client must pass a valid JWT token as a query-param
-?token=<jwt> on the initial connect (cookies can't be set on WS upgrade).
+Authentication: the browser's httpOnly session cookie is sent automatically on the
+WS upgrade request (same-origin). The backend reads it directly from the headers,
+so the frontend just connects to /api/ws with no extra token setup.
 
 Events published on the bus and forwarded here (kind → payload):
   tick          → {token, ltp, ts, pnl, in_position}
@@ -13,7 +14,7 @@ Events published on the bus and forwarded here (kind → payload):
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from core.events import bus
 from core.logging import get_logger
@@ -24,12 +25,10 @@ log = get_logger(__name__)
 
 
 @router.websocket("/ws")
-async def ws_endpoint(
-    websocket: WebSocket,
-    token: str | None = Query(default=None),
-) -> None:
-    # Validate JWT before accepting the connection
-    if not token or not _valid_token(token):
+async def ws_endpoint(websocket: WebSocket) -> None:
+    # Session cookie is sent automatically on WS upgrade for same-origin connections.
+    session_token = websocket.cookies.get("session")
+    if not session_token or not _valid_token(session_token):
         await websocket.close(code=4001)
         log.warning("ws_auth_rejected")
         return
