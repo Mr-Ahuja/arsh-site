@@ -1,0 +1,17 @@
+# Runtime dependencies for VPS deploy (deployment.md §3).
+# Mirrors the runtime deps in pyproject.toml, pinned to the versions validated in CI/dev.
+# Dev tools (ruff/black/mypy/pytest) are intentionally excluded — install via `pip install -e ".[dev]"` for development.
+fastapi==0.138.1
+uvicorn[standard]==0.49.0
+pydantic==2.13.4
+pydantic-settings==2.14.2
+SQLAlchemy[asyncio]==2.0.51
+aiosqlite==0.22.1
+alembic==1.18.5
+kiteconnect==5.2.0
+argon2-cffi==25.1.0
+PyJWT==2.13.0
+cryptography==49.0.0
+structlog==26.1.0
+httpx==0.28.1
+python-multipart==0.0.32

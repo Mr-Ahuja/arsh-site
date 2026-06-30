@@ -1,0 +1,6 @@
+# Reverse proxy + automatic Let's Encrypt TLS. WebSocket upgrades pass through automatically.
+# Replace the domain below with your real one (must match the Kite redirect URL host).
+arsh.thechosenone.in {
+    reverse_proxy 127.0.0.1:8000
+    encode gzip
+}

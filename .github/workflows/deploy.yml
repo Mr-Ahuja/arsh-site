@@ -1,0 +1,120 @@
+name: Deploy
+
+# Continuous deployment to the Hostinger VPS. Runs on every push to main (i.e. when a
+# develop -> main release PR is merged) and can be triggered manually. The job builds the
+# server .env from GitHub Secrets/Variables, then SSHes in to pull + install + migrate +
+# build + restart. If the SSH secrets aren't configured yet it skips cleanly (stays green).
+#
+# Required secrets (Settings -> Secrets and variables -> Actions):
+#   VPS_HOST            VPS IP or hostname
+#   VPS_USER            SSH user (e.g. trader) with NOPASSWD sudo for: systemctl restart api.service
+#   VPS_SSH_KEY         private SSH key (the matching public key in the VPS user's authorized_keys)
+#   APP_SECRET          (already set) session/JWT signing + at-rest encryption key
+#   KILL_TOKEN          (already set) emergency kill-switch token
+#   APP_PASSWORD_HASH   (already set) argon2id hash of the dashboard password
+#   KITE_API_KEY/SECRET (optional) — preferred path is the in-app Settings page
+#   TELEGRAM_BOT_TOKEN/CHAT_ID (optional)
+# Optional secrets: VPS_PORT (default 22), VPS_APP_DIR (default /opt/trade-engine/app)
+# Required variables: APP_USERNAME (set), BASE_URL (set)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check deploy config
+        id: guard
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          if [ -n "$VPS_HOST" ] && [ -n "$VPS_SSH_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::VPS_HOST / VPS_SSH_KEY not set — skipping deploy. Add them in repo Settings → Secrets and variables → Actions."
+          fi
+
+      - name: Setup SSH
+        if: steps.guard.outputs.ready == 'true'
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p "${VPS_PORT:-22}" "$VPS_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Push production .env to server
+        if: steps.guard.outputs.ready == 'true'
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+          BASE_URL: ${{ vars.BASE_URL }}
+          APP_USERNAME: ${{ vars.APP_USERNAME }}
+          APP_SECRET: ${{ secrets.APP_SECRET }}
+          KILL_TOKEN: ${{ secrets.KILL_TOKEN }}
+          APP_PASSWORD_HASH: ${{ secrets.APP_PASSWORD_HASH }}
+          KITE_API_KEY: ${{ secrets.KITE_API_KEY }}
+          KITE_API_SECRET: ${{ secrets.KITE_API_SECRET }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          APP_DIR="${VPS_APP_DIR:-/opt/trade-engine/app}"
+          PORT="${VPS_PORT:-22}"
+          umask 077
+          # Build .env line-by-line so values containing '$' (e.g. the argon2 hash) are written literally.
+          {
+            echo "APP_ENV=prod"
+            printf 'BASE_URL=%s\n' "$BASE_URL"
+            echo "DB_PATH=/opt/trade-engine/data/trade.db"
+            printf 'APP_SECRET=%s\n' "$APP_SECRET"
+            printf 'KILL_TOKEN=%s\n' "$KILL_TOKEN"
+            printf 'APP_USERNAME=%s\n' "$APP_USERNAME"
+            printf 'APP_PASSWORD_HASH=%s\n' "$APP_PASSWORD_HASH"
+            printf 'KITE_API_KEY=%s\n' "$KITE_API_KEY"
+            printf 'KITE_API_SECRET=%s\n' "$KITE_API_SECRET"
+            printf 'TELEGRAM_BOT_TOKEN=%s\n' "$TELEGRAM_BOT_TOKEN"
+            printf 'TELEGRAM_CHAT_ID=%s\n' "$TELEGRAM_CHAT_ID"
+          } > env.production
+          scp -P "$PORT" -i ~/.ssh/id_deploy env.production "$VPS_USER@$VPS_HOST:/tmp/te.env"
+          rm -f env.production
+          ssh -p "$PORT" -i ~/.ssh/id_deploy "$VPS_USER@$VPS_HOST" \
+            "install -m 600 /tmp/te.env '$APP_DIR/.env' && rm -f /tmp/te.env && echo '.env updated'"
+
+      - name: Deploy (pull, install, migrate, build, restart)
+        if: steps.guard.outputs.ready == 'true'
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+          VPS_PORT: ${{ secrets.VPS_PORT }}
+          VPS_APP_DIR: ${{ secrets.VPS_APP_DIR }}
+        run: |
+          APP_DIR="${VPS_APP_DIR:-/opt/trade-engine/app}"
+          PORT="${VPS_PORT:-22}"
+          ssh -p "$PORT" -i ~/.ssh/id_deploy "$VPS_USER@$VPS_HOST" "APP_DIR='$APP_DIR' bash -se" <<'REMOTE'
+          set -euo pipefail
+          cd "$APP_DIR"
+          git fetch --all --prune
+          git checkout main
+          git reset --hard origin/main
+          bash deploy/deploy.sh
+          sudo systemctl restart api.service
+          sleep 2
+          sudo systemctl --no-pager --lines=0 status api.service || true
+          echo "Deployed commit: $(git rev-parse --short HEAD)"
+          REMOTE
