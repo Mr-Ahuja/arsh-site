@@ -60,10 +60,25 @@ def _clean_state():
     async def _wipe():
         from sqlalchemy import delete
 
-        from db.models import Event, KiteSession, Setting
+        from db.models import (
+            Backtest,
+            Candle,
+            Equity,
+            Event,
+            KiteSession,
+            Order,
+            Run,
+            Setting,
+            Tick,
+            Trade,
+            TradeVar,
+        )
 
         async with engine.begin() as conn:
-            for model in (Setting, KiteSession, Event):
+            for model in (
+                TradeVar, Order, Equity, Trade, Candle, Tick,
+                Backtest, Run, Setting, KiteSession, Event,
+            ):
                 await conn.execute(delete(model))
 
     _run(_wipe())
