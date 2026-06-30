@@ -38,7 +38,7 @@ packages = [
     "core", "db", "db.repositories",
     "integrations", "integrations.kite", "integrations.telegram",
     "services", "api", "api.routes",
-    "engine", "engine.data", "engine.strategy",
+    "engine", "engine.data", "engine.strategy", "engine.brokers",
     "strategies",
 ]
 

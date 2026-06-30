@@ -37,6 +37,11 @@ def current_user(request: Request) -> str:
         raise AuthError("invalid session") from exc
 
 
+def decode_token(token: str) -> dict:
+    """Decode and validate a JWT. Used by the WebSocket endpoint (no cookie available)."""
+    return jwt.decode(token, get_settings().app_secret, algorithms=["HS256"])
+
+
 def require_csrf(request: Request) -> None:
     cookie = request.cookies.get("csrf")
     header = request.headers.get("x-csrf-token")
