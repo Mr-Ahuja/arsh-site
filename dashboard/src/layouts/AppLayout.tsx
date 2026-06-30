@@ -19,6 +19,7 @@ const navItems = [
   { to: "/history", label: "Orders" },
   { to: "/analytics", label: "Analytics" },
   { to: "/backtest", label: "Backtest" },
+  { to: "/docs", label: "Docs" },
   { to: "/settings", label: "Settings" },
 ];
 
@@ -76,7 +77,15 @@ function ProfileMenu() {
   );
 }
 
-export function AppLayout({ children, rail = true }: { children: ReactNode; rail?: boolean }) {
+export function AppLayout({
+  children,
+  rail = true,
+  noPad = false,
+}: {
+  children: ReactNode;
+  rail?: boolean;
+  noPad?: boolean;
+}) {
   const { data: kite } = useQuery({
     queryKey: ["kite-status"],
     queryFn: () => apiGet<KiteStatus>("/kite/status"),
@@ -130,7 +139,7 @@ export function AppLayout({ children, rail = true }: { children: ReactNode; rail
       {/* ── Workspace ──────────────────────────────────────────────────── */}
       <div className="flex min-h-0 flex-1">
         {rail && <Watchlist />}
-        <main className="min-w-0 flex-1 overflow-y-auto p-4">{children}</main>
+        <main className={`min-w-0 flex-1 overflow-y-auto ${noPad ? "" : "p-4"}`}>{children}</main>
       </div>
     </div>
   );
