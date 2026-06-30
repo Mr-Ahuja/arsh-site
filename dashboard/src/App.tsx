@@ -8,7 +8,8 @@ import { KiteConnect } from "./features/auth/KiteConnect";
 import { CockpitPage } from "./features/cockpit/CockpitPage";
 import { DocsPage } from "./features/docs/DocsPage";
 import { HistoryPage } from "./features/history/HistoryPage";
-import { Placeholder } from "./features/Placeholder";
+import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
+import { BacktestPage } from "./features/backtest/BacktestPage";
 
 function Protected({
   children,
@@ -32,22 +33,8 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/" element={<Protected><CockpitPage /></Protected>} />
       <Route path="/history" element={<Protected><HistoryPage /></Protected>} />
-      <Route
-        path="/analytics"
-        element={
-          <Protected>
-            <Placeholder title="Analytics" note="Equity curve, drawdown & metrics arrive in Task 11." />
-          </Protected>
-        }
-      />
-      <Route
-        path="/backtest"
-        element={
-          <Protected>
-            <Placeholder title="Backtest" note="The backtest runner arrives in Task 12." />
-          </Protected>
-        }
-      />
+      <Route path="/analytics" element={<Protected><AnalyticsPage /></Protected>} />
+      <Route path="/backtest" element={<Protected><BacktestPage /></Protected>} />
       <Route path="/settings" element={<Protected rail={false}><SettingsPage /></Protected>} />
       <Route path="/connect" element={<Protected rail={false}><KiteConnect /></Protected>} />
       {/* Docs — no rail, no padding; DocsPage manages its own sidebar and scroll */}
