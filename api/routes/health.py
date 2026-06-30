@@ -51,10 +51,9 @@ async def system_health(
     optional_set = _OPTIONAL_SETTINGS & present
 
     # DB file size
-    db_path = cfg.database_url.replace("sqlite+aiosqlite:///", "").replace("sqlite:///", "")
     db_size_bytes: int | None = None
     try:
-        db_size_bytes = os.path.getsize(db_path)
+        db_size_bytes = os.path.getsize(cfg.db_path)
     except OSError:
         pass
 
