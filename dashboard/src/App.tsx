@@ -7,6 +7,7 @@ import { SettingsPage } from "./features/settings/SettingsPage";
 import { KiteConnect } from "./features/auth/KiteConnect";
 import { CockpitPage } from "./features/cockpit/CockpitPage";
 import { DocsPage } from "./features/docs/DocsPage";
+import { HistoryPage } from "./features/history/HistoryPage";
 import { Placeholder } from "./features/Placeholder";
 
 function Protected({
@@ -30,14 +31,7 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route path="/" element={<Protected><CockpitPage /></Protected>} />
-      <Route
-        path="/history"
-        element={
-          <Protected>
-            <Placeholder title="Orders" note="Order history & trade journal arrive in Task 10." />
-          </Protected>
-        }
-      />
+      <Route path="/history" element={<Protected><HistoryPage /></Protected>} />
       <Route
         path="/analytics"
         element={
