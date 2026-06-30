@@ -38,7 +38,7 @@ packages = [
     "core", "db", "db.repositories",
     "integrations", "integrations.kite", "integrations.telegram",
     "services", "api", "api.routes",
-    "engine", "engine.data",
+    "engine", "engine.data", "engine.strategy",
     "strategies",
 ]
 
@@ -50,7 +50,7 @@ target-version = "py312"
 select = ["E", "F", "I", "UP", "B"]
 # E501: line length handled by black; B008: FastAPI Depends() in defaults is the framework idiom;
 # UP040/UP046/UP047: PEP 695 type-param syntax is optional, not required for 3.12.
-ignore = ["E501", "B008", "UP040", "UP046", "UP047"]
+ignore = ["E501", "B008", "B027", "UP040", "UP046", "UP047"]
 
 [tool.black]
 line-length = 100
