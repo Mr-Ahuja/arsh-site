@@ -38,6 +38,16 @@ class ReconcileAdoptIn(BaseModel):
     avg_price: float
 
 
+# ── Strategies discovery ──────────────────────────────────────────────────────
+
+@router.get("/strategies")
+async def list_strategies(user: str = Depends(current_user)) -> ApiResponse:
+    """Return all BaseStrategy subclasses found in the strategies/ package."""
+    from engine.strategy.loader import discover_strategies
+    found = discover_strategies()
+    return ApiResponse(data={"strategies": list(found.keys())})
+
+
 # ── Status ─────────────────────────────────────────────────────────────────────
 
 @router.get("/status")
@@ -191,6 +201,59 @@ async def engine_resume(
         raise AppValidationError("Engine is not in SAFE mode.")
     await s.runner.reconcile_resume()
     return ApiResponse(data={"resumed": True})
+
+
+# ── Trade data queries (for cockpit position card) ────────────────────────────
+
+@router.get("/trades")
+async def list_trades(
+    run_id: int | None = None,
+    status: str | None = None,
+    user: str = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ApiResponse:
+    """List trades for a run, optionally filtered by status."""
+    from sqlalchemy import select
+
+    from db.models import Trade
+
+    stmt = select(Trade)
+    if run_id is not None:
+        stmt = stmt.where(Trade.run_id == run_id)
+    if status is not None:
+        stmt = stmt.where(Trade.status == status)
+    stmt = stmt.order_by(Trade.entry_at.desc()).limit(50)
+    result = await session.execute(stmt)
+    trades = result.scalars().all()
+    return ApiResponse(data=[
+        {
+            "id": t.id, "symbol": t.symbol, "side": t.side, "qty": t.qty,
+            "mode": t.mode, "entry_price": t.entry_price,
+            "entry_at": t.entry_at.isoformat(), "status": t.status,
+            "exit_price": t.exit_price, "exit_at": t.exit_at.isoformat() if t.exit_at else None,
+            "pnl": t.pnl, "exit_reason": t.exit_reason,
+        }
+        for t in trades
+    ])
+
+
+@router.get("/trades/{trade_id}/vars")
+async def get_trade_vars(
+    trade_id: int,
+    user: str = Depends(current_user),
+    session: AsyncSession = Depends(get_session),
+) -> ApiResponse:
+    """Latest pos.vars snapshot for a trade (key-value pairs for the UI table)."""
+    import json
+
+    from db.repositories import TradeVarRepository
+
+    repo = TradeVarRepository(session)
+    latest = await repo.latest(trade_id)
+    if not latest:
+        return ApiResponse(data=[])
+    snap = json.loads(latest.vars_json)
+    return ApiResponse(data=[{"key": k, "value": v} for k, v in snap.items()])
 
 
 # ── Kite postback webhook (no auth — Kite calls this) ─────────────────────────
