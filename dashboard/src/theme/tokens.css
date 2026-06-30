@@ -1,0 +1,100 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Kite-inspired palette. Light is default; .dark swaps the variables. ───────── */
+:root {
+  --canvas: #ffffff; /* nav / cards */
+  --surface: #ffffff;
+  --surface-alt: #f7f8fa; /* workspace background */
+  --surface-hover: #f0f3f7;
+  --line: #e6e9ee; /* thin dividers */
+  --line-strong: #d4d9e0;
+
+  --ink: #1c2128; /* primary text / numbers */
+  --ink-soft: #424b57;
+  --ink-muted: #8a929e; /* labels, secondary */
+
+  --brand: #387ed1; /* Kite blue — primary action */
+  --brand-bg: #eaf2fb;
+
+  --buy: #4184f3; /* buy = blue */
+  --sell: #ff5722; /* sell = orange-red */
+
+  --pos: #14a44d; /* profit / up */
+  --neg: #e03b3b; /* loss / down */
+  --pos-bg: #e7f6ee;
+  --neg-bg: #fdeaea;
+
+  --warn: #d98324;
+  --warn-bg: #fbf1e4;
+
+  color-scheme: light;
+}
+
+.dark {
+  --canvas: #1a1d21;
+  --surface: #1a1d21;
+  --surface-alt: #131619;
+  --surface-hover: #23272d;
+  --line: #2a2f36;
+  --line-strong: #3a414a;
+
+  --ink: #e3e6ea;
+  --ink-soft: #b3bac3;
+  --ink-muted: #79818c;
+
+  --brand: #4d94e0;
+  --brand-bg: #1b2b3d;
+
+  --buy: #4184f3;
+  --sell: #ff6a3d;
+
+  --pos: #25c268;
+  --neg: #f0584f;
+  --pos-bg: #14271d;
+  --neg-bg: #2a1718;
+
+  --warn: #e0973f;
+  --warn-bg: #2a2113;
+
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: "Inter", "IBM Plex Sans", system-ui, sans-serif;
+  font-size: 13px;
+  color: var(--ink);
+  background: var(--surface-alt);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+@layer utilities {
+  /* Tabular numerals for all price/P&L figures — columns align like a terminal. */
+  .num {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+  }
+}
+
+/* Calm, thin scrollbars to match the dense terminal feel. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 4px;
+}
