@@ -26,6 +26,18 @@ class Settings(BaseSettings):
     rolling_buffer_candles: int = 500         # in-memory candle lookback window
     rolling_buffer_ticks: int = 1000          # in-memory tick lookback window
 
+    # ── Broker / fills (Task 05) ──────────────────────────────────────────────
+    fill_delay_ticks: int = 1                 # paper: ticks after signal before fill
+    slippage_bps: float = 3.0                 # basis points slippage if depth unavailable
+    tick_size: float = 0.05                   # minimum price movement (NSE equities)
+    enforce_circuit_limits: bool = True       # reject orders outside daily circuit band
+    enforce_liquidity: bool = True            # reject when depth is empty/zero
+
+    # ── Risk backstops (Task 06) ──────────────────────────────────────────────
+    max_daily_loss: float = 5000.0            # INR; engine halts when realised+unrealised loss hits
+    force_squareoff_time: str = "15:15"       # IST HH:MM — engine exits open position at this time
+    max_order_retries: int = 3                # live broker: transient-failure retry attempts
+
     @property
     def cookie_secure(self) -> bool:
         """Secure cookies everywhere except local dev over http."""

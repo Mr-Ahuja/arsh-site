@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from contextlib import asynccontextmanager
 
@@ -12,11 +13,12 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api import ws
-from api.routes import auth, health, kite, settings
+from api.routes import auth, engine, health, kite, settings
 from core.config import get_settings
 from core.errors import register_error_handlers
 from core.logging import get_logger
 from db.base import async_session
+from integrations.telegram.alerts import run_alert_subscriber
 from services import kite_service
 
 log = get_logger(__name__)
@@ -45,7 +47,11 @@ async def _lifespan(app: FastAPI):  # noqa: ANN001
                 log.info("kite_client_restored")
     except Exception as exc:  # DB may not be migrated yet — non-fatal at startup
         log.info("kite_restore_skipped", error=str(exc))
+
+    # Start Telegram alert subscriber (runs in background, never blocks)
+    alert_task = asyncio.ensure_future(run_alert_subscriber())
     yield
+    alert_task.cancel()
 
 
 def create_app() -> FastAPI:
@@ -67,6 +73,7 @@ def create_app() -> FastAPI:
     app.include_router(auth.router, prefix="/api/auth")
     app.include_router(settings.router, prefix="/api/settings")
     app.include_router(kite.router, prefix="/api/kite")
+    app.include_router(engine.router, prefix="/api/engine")
     app.include_router(ws.router, prefix="/api")
 
     # Serve the built SPA when present (production-style single deployable unit).
