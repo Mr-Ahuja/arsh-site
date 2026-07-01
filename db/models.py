@@ -205,3 +205,26 @@ class Backtest(Base):
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     result_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # trades + metrics
+
+
+# ── Instruments buffer (searchable picker) ────────────────────────────────────
+
+class Instrument(Base):
+    """Buffered Kite equity instruments (NSE/BSE) for the searchable picker.
+
+    Refreshed from Kite once per day; wiped + reloaded on each sync.
+    """
+
+    __tablename__ = "instruments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    instrument_token: Mapped[int] = mapped_column(Integer, index=True)
+    exchange: Mapped[str] = mapped_column(String(8))          # NSE | BSE
+    tradingsymbol: Mapped[str] = mapped_column(String(64), index=True)
+    name: Mapped[str] = mapped_column(String(128), default="")
+    synced_on: Mapped[str] = mapped_column(String(10))        # YYYY-MM-DD of last sync
+
+    __table_args__ = (
+        UniqueConstraint("exchange", "tradingsymbol", name="uq_instrument_exch_symbol"),
+        Index("ix_instrument_search", "exchange", "tradingsymbol"),
+    )

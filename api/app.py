@@ -20,6 +20,7 @@ from api.routes import (
     engine,
     health,
     history,
+    instruments,
     kite,
     settings,
     strategies,
@@ -88,6 +89,7 @@ def create_app() -> FastAPI:
     app.include_router(analytics.router, prefix="/api/analytics")
     app.include_router(backtest.router, prefix="/api/backtest")
     app.include_router(strategies.router, prefix="/api/strategies")
+    app.include_router(instruments.router, prefix="/api/instruments")
     app.include_router(ws.router, prefix="/api")
 
     # Serve the built SPA when present (production-style single deployable unit).
