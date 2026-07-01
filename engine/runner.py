@@ -75,6 +75,7 @@ class EngineRunner:
         self._risk_state = RiskState()
         self._position: Position | None = None
         self._trade_id: int | None = None
+        self._pending_entry_side: str | None = None  # "BUY"/"SELL" of the in-flight entry
         self._stopping = asyncio.Event()
 
     # ── Public API ─────────────────────────────────────────────────────────────
@@ -112,8 +113,9 @@ class EngineRunner:
 
         strategy = self._strategy
 
-        # 1. Feed tick-mode indicators
+        # 1. Feed tick-mode indicators + track session open price / first-tick flag
         strategy._feed_tick(tick)
+        strategy._observe(tick)
 
         # 2. Process broker fills (paper/live: MARKET fills trigger here)
         fills = await self._broker.on_tick(tick)
@@ -280,6 +282,7 @@ class EngineRunner:
 
         symbol = self._strategy.instrument
         token = tick.instrument_token
+        self._pending_entry_side = order.side  # remember BUY/SELL for the fill → LONG/SHORT map
 
         # Persist trade first (CREATED order will link back)
         async with async_session() as s:
@@ -340,7 +343,7 @@ class EngineRunner:
                         await repo.update(self._trade_id, entry_price=fill.avg_price)
                 self._position = Position(
                     trade_id=self._trade_id or -1,
-                    side="LONG" if fill.order_ref and True else "SHORT",
+                    side="LONG" if self._pending_entry_side == "BUY" else "SHORT",
                     qty=fill.filled_qty,
                     entry_price=fill.avg_price,
                     entry_time=fill.ts,
@@ -362,6 +365,7 @@ class EngineRunner:
                 self._risk_guard.record_closed_trade(self._risk_state, pnl)
                 self._position = None
                 self._trade_id = None
+                self._pending_entry_side = None
 
                 await bus.publish(Event("trade_closed", {
                     "pnl": round(pnl, 2),

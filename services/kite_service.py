@@ -70,3 +70,18 @@ async def restore_client(session: AsyncSession) -> bool:
     client.configure(api_key)
     client.set_access_token(access_token)
     return True
+
+
+async def ensure_client(session: AsyncSession) -> bool:
+    """Guarantee the shared in-memory client is authenticated for API calls.
+
+    The header/status endpoint trusts the DB token, but the in-memory client is only
+    primed by an interactive login or by restore_client() at startup. After a restart
+    (or if startup restore was skipped) the two can disagree — the DB shows connected
+    while the process-wide client has no token, so historical/order calls fail. This
+    rehydrates the in-memory client from the stored token on demand so consumers agree
+    with what /kite/status reports. Returns True if the client is ready.
+    """
+    if get_kite().connected:
+        return True
+    return await restore_client(session)

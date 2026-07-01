@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { MetricsGrid, type Metrics } from "../analytics/MetricsGrid";
 import { EquityChart, type EquityPoint } from "../analytics/Charts";
+import { InstrumentPicker, type Instrument } from "./InstrumentPicker";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -46,7 +47,7 @@ function statusTone(s: string): "pos" | "neg" | "warn" | "muted" | "brand" {
 function BacktestForm({ onSubmitted }: { onSubmitted: (id: number) => void }) {
   const qc = useQueryClient();
   const [strategy, setStrategy] = useState("");
-  const [symbol, setSymbol] = useState("");
+  const [instrument, setInstrument] = useState<Instrument | null>(null);
   const [timeframe, setTimeframe] = useState("5minute");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -82,8 +83,15 @@ function BacktestForm({ onSubmitted }: { onSubmitted: (id: number) => void }) {
       setParamsErr("Must be valid JSON");
       return;
     }
-    if (!symbol.trim()) return;
-    submit.mutate({ strategy, symbol: symbol.trim(), timeframe, date_from: dateFrom, date_to: dateTo, params });
+    if (!instrument) return;
+    submit.mutate({
+      strategy,
+      symbol: String(instrument.instrument_token),
+      timeframe,
+      date_from: dateFrom,
+      date_to: dateTo,
+      params,
+    });
   }
 
   return (
@@ -98,17 +106,8 @@ function BacktestForm({ onSubmitted }: { onSubmitted: (id: number) => void }) {
       </div>
 
       <div>
-        <label className={LABEL_CLS}>Instrument token</label>
-        <input
-          value={symbol}
-          onChange={(e) => setSymbol(e.target.value)}
-          placeholder="e.g. 256265 (NIFTY 50)"
-          className={INPUT_CLS}
-          required
-        />
-        <p className="mt-1 text-2xs text-ink-muted">
-          Find the token in Zerodha's instruments CSV or the API instruments dump.
-        </p>
+        <label className={LABEL_CLS}>Instrument</label>
+        <InstrumentPicker value={instrument} onChange={setInstrument} />
       </div>
 
       <div>
@@ -149,7 +148,7 @@ function BacktestForm({ onSubmitted }: { onSubmitted: (id: number) => void }) {
         </p>
       )}
 
-      <Button type="submit" size="sm" disabled={submit.isPending || !strategy || !symbol}>
+      <Button type="submit" size="sm" disabled={submit.isPending || !strategy || !instrument}>
         {submit.isPending ? "Submitting…" : "Run Backtest"}
       </Button>
     </form>

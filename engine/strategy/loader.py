@@ -72,10 +72,14 @@ def discover_strategies() -> dict[str, type[BaseStrategy]]:
             log.warning("strategy_discover_skip", module=full_module, error=str(exc))
             continue
         for attr_name, obj in inspect.getmembers(mod, inspect.isclass):
-            if issubclass(obj, BaseStrategy) and obj is not BaseStrategy and obj.__module__ == full_module:
-                key = f"{module_name}.{attr_name}"
-                found[key] = obj
-                log.info("strategy_discovered", name=key)
+            if not (issubclass(obj, BaseStrategy) and obj is not BaseStrategy and obj.__module__ == full_module):
+                continue
+            # Skip non-runnable shared bases: abstract=True or leading-underscore names
+            if attr_name.startswith("_") or obj.__dict__.get("abstract", False):
+                continue
+            key = f"{module_name}.{attr_name}"
+            found[key] = obj
+            log.info("strategy_discovered", name=key)
     return found
 
 

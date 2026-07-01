@@ -11,5 +11,6 @@ export const DOCS: DocEntry[] = [
   { slug: "orders", title: "Orders", file: "/docs/04-orders.md" },
   { slug: "analytics", title: "Analytics", file: "/docs/05-analytics.md" },
   { slug: "backtest", title: "Backtest", file: "/docs/06-backtest.md" },
+  { slug: "strategies", title: "Writing Strategies", file: "/docs/08-strategies.md" },
   { slug: "go-live", title: "Go-Live Checklist", file: "/docs/07-go-live.md" },
 ];

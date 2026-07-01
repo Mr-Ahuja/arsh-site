@@ -56,3 +56,6 @@ export async function apiPost<T>(url: string, body?: unknown): Promise<T> {
 export async function apiPut<T>(url: string, body?: unknown): Promise<T> {
   return (await http.put<T>(url, body)).data;
 }
+export async function apiDelete<T>(url: string): Promise<T> {
+  return (await http.delete<T>(url)).data;
+}

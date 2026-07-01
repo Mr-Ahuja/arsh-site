@@ -10,6 +10,7 @@ import { DocsPage } from "./features/docs/DocsPage";
 import { HistoryPage } from "./features/history/HistoryPage";
 import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
 import { BacktestPage } from "./features/backtest/BacktestPage";
+import { StrategyEditorPage } from "./features/strategies/StrategyEditorPage";
 
 function Protected({
   children,
@@ -35,6 +36,7 @@ export default function App() {
       <Route path="/history" element={<Protected><HistoryPage /></Protected>} />
       <Route path="/analytics" element={<Protected><AnalyticsPage /></Protected>} />
       <Route path="/backtest" element={<Protected><BacktestPage /></Protected>} />
+      <Route path="/strategies" element={<Protected rail={false} noPad><StrategyEditorPage /></Protected>} />
       <Route path="/settings" element={<Protected rail={false}><SettingsPage /></Protected>} />
       <Route path="/connect" element={<Protected rail={false}><KiteConnect /></Protected>} />
       {/* Docs — no rail, no padding; DocsPage manages its own sidebar and scroll */}

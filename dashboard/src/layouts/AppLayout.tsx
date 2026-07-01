@@ -19,6 +19,7 @@ const navItems = [
   { to: "/history", label: "Orders" },
   { to: "/analytics", label: "Analytics" },
   { to: "/backtest", label: "Backtest" },
+  { to: "/strategies", label: "Strategies" },
   { to: "/docs", label: "Docs" },
   { to: "/settings", label: "Settings" },
 ];
