@@ -18,7 +18,7 @@ from db.models import Backtest, Run, Trade
 from engine.data.types import CandleData, TickData
 from engine.strategy.loader import instantiate, load_strategy
 from engine.strategy.position import Position
-from integrations.kite.historical import fetch_candles
+from integrations.kite.historical import fetch_candles, resolve_token
 
 # IST end-of-session forced square-off (matches engine RiskGuard default)
 _SQUAREOFF = time(15, 15)
@@ -88,9 +88,12 @@ async def run_backtest(backtest_id: int) -> None:
             if not await kite_service.ensure_client(session):
                 raise RuntimeError("Kite not connected — log in via the dashboard first.")
 
+            # Accept a numeric token or a symbol name (e.g. "KOTAKBANK" / "NSE:KOTAKBANK").
+            instrument_token = await resolve_token(bt.symbol)
+
             # ── Fetch historical candles ─────────────────────────────────────
             raw_candles = await fetch_candles(
-                instrument_token=int(bt.symbol.split(":")[1]) if ":" in bt.symbol else int(bt.symbol),
+                instrument_token=instrument_token,
                 from_date=bt.date_from,
                 to_date=bt.date_to,
                 interval=bt.timeframe,

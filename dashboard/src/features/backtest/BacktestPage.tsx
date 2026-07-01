@@ -98,16 +98,16 @@ function BacktestForm({ onSubmitted }: { onSubmitted: (id: number) => void }) {
       </div>
 
       <div>
-        <label className={LABEL_CLS}>Instrument token</label>
+        <label className={LABEL_CLS}>Instrument</label>
         <input
           value={symbol}
           onChange={(e) => setSymbol(e.target.value)}
-          placeholder="e.g. 256265 (NIFTY 50)"
+          placeholder="e.g. KOTAKBANK, NSE:SBIN, or 256265"
           className={INPUT_CLS}
           required
         />
         <p className="mt-1 text-2xs text-ink-muted">
-          Find the token in Zerodha's instruments CSV or the API instruments dump.
+          A trading symbol (defaults to NSE) or a numeric instrument token.
         </p>
       </div>
 
