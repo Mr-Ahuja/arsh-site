@@ -81,6 +81,13 @@ async def run_backtest(backtest_id: int) -> None:
 
             params = json.loads(bt.params_json or "{}")
 
+            # Rehydrate the shared Kite client from the stored token if this process
+            # hasn't primed it yet (e.g. after a restart) — keeps the historical fetch
+            # consistent with what /kite/status shows in the header.
+            from services import kite_service
+            if not await kite_service.ensure_client(session):
+                raise RuntimeError("Kite not connected — log in via the dashboard first.")
+
             # ── Fetch historical candles ─────────────────────────────────────
             raw_candles = await fetch_candles(
                 instrument_token=int(bt.symbol.split(":")[1]) if ":" in bt.symbol else int(bt.symbol),
