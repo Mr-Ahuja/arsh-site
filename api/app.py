@@ -13,7 +13,17 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from api import ws
-from api.routes import analytics, auth, backtest, engine, health, history, kite, settings
+from api.routes import (
+    analytics,
+    auth,
+    backtest,
+    engine,
+    health,
+    history,
+    kite,
+    settings,
+    strategies,
+)
 from core.config import get_settings
 from core.errors import register_error_handlers
 from core.logging import get_logger
@@ -77,6 +87,7 @@ def create_app() -> FastAPI:
     app.include_router(history.router, prefix="/api/history")
     app.include_router(analytics.router, prefix="/api/analytics")
     app.include_router(backtest.router, prefix="/api/backtest")
+    app.include_router(strategies.router, prefix="/api/strategies")
     app.include_router(ws.router, prefix="/api")
 
     # Serve the built SPA when present (production-style single deployable unit).

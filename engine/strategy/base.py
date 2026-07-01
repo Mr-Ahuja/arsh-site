@@ -26,8 +26,10 @@ Minimal example:
 from __future__ import annotations
 
 import time
+from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
+from core.clock import IST, MARKET_OPEN, now_ist
 from core.logging import get_logger
 from engine.data.types import CandleData, TickData
 from engine.strategy.indicators import Indicator
@@ -57,6 +59,7 @@ class BaseStrategy:
     timeframe: str = "5minute"    # candle interval
     params: dict[str, Any] = {}   # tunables; overridable per run
     param_schema: dict[str, Any] = {}  # optional validation schema
+    abstract: bool = False        # mark True on shared base classes; loader skips them
 
     # ── Engine-injected (set by loader before on_start) ───────────────────────
 
@@ -67,6 +70,35 @@ class BaseStrategy:
     def __init__(self) -> None:
         self._indicators: list[Indicator] = []
         self._hard_overruns: int = 0
+        # Session tracking — populated by the engine via _observe() on each tick
+        self._session_date: str | None = None
+        self.day_open: float | None = None          # first price seen this IST session
+        self.first_tick_of_session: bool = False     # True only on the day's first tick
+
+    # ── Time / session helpers ────────────────────────────────────────────────
+
+    def now_ist(self) -> datetime:
+        """Current wall-clock time in IST. Use this instead of datetime.now()."""
+        return now_ist()
+
+    def minutes_since_open(self, tick: TickData) -> float:
+        """Minutes elapsed since 09:15 IST for this tick (negative before open)."""
+        t = tick.ts.astimezone(IST)
+        open_dt = t.replace(
+            hour=MARKET_OPEN.hour, minute=MARKET_OPEN.minute, second=0, microsecond=0
+        )
+        return (t - open_dt).total_seconds() / 60.0
+
+    def _observe(self, tick: TickData) -> None:
+        """Engine-internal: called once per tick before hooks. Tracks the session's
+        opening price and flags the first tick of each new IST trading day."""
+        day = tick.ts.astimezone(IST).strftime("%Y-%m-%d")
+        if day != self._session_date:
+            self._session_date = day
+            self.day_open = tick.ltp
+            self.first_tick_of_session = True
+        else:
+            self.first_tick_of_session = False
 
     # ── Lifecycle hooks (implement in your subclass) ───────────────────────────
 

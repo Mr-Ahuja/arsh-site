@@ -7,17 +7,21 @@ while the paper/live engine is idle.
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, time
 
 from sqlalchemy import select
 
+from core.clock import IST
 from core.logging import get_logger
 from db.base import async_session
 from db.models import Backtest, Run, Trade
-from engine.brokers.backtest import BacktestBroker
-from engine.data.types import CandleData
+from engine.data.types import CandleData, TickData
 from engine.strategy.loader import instantiate, load_strategy
+from engine.strategy.position import Position
 from integrations.kite.historical import fetch_candles
+
+# IST end-of-session forced square-off (matches engine RiskGuard default)
+_SQUAREOFF = time(15, 15)
 
 log = get_logger(__name__)
 
@@ -100,17 +104,17 @@ async def run_backtest(backtest_id: int) -> None:
             await session.flush()  # get run.id
             run_id = run.id
 
-            # ── Build minimal engine components ──────────────────────────────
+            # ── Build the strategy ───────────────────────────────────────────
+            # This is a close-price simulator: entries/exits are booked at each
+            # candle's close (no broker fill queue). Intrabar precision is therefore
+            # approximate — see docs/06-backtest.md.
             cls = load_strategy(bt.strategy)
             strategy = instantiate(cls, params_override=params)
             strategy._run_id = run_id
             strategy._mode = "backtest"
 
-            broker = BacktestBroker(run_id=run_id)
-
             strategy.on_start()
             strategy._reset_session_indicators()
-            await broker.start()
 
             position = None
             trade_id = None
@@ -136,18 +140,25 @@ async def run_backtest(backtest_id: int) -> None:
                 )
 
                 strategy._feed_candle(candle)
-                fills = await broker.on_candle(candle)
 
-                # Handle fills (simplified — no DB writes during backtest loop)
-                for fill in fills:
-                    log.debug("backtest_fill", ref=fill.order_ref, state=fill.state)
+                # The hooks expect a TickData (with .ltp); synthesize one at the bar
+                # close. NOTE: close-only ticks → intrabar stop precision is approximate
+                # (a stop touched and recovered within the bar is not seen).
+                tick = TickData(
+                    instrument_token=0,
+                    ts=candle.ts,
+                    ltp=candle.close,
+                    qty=0,
+                    volume=int(raw["volume"]),
+                )
+                strategy._observe(tick)
 
                 # Strategy hooks
                 if position is None:
-                    order = strategy._call_entry(candle)
+                    order = strategy._call_entry(tick)
                     if order:
+                        side = "LONG" if order.side == "BUY" else "SHORT"
                         # Record in DB and open position
-                        from engine.strategy.position import Position
                         trade = Trade(
                             run_id=run_id,
                             symbol=str(bt.symbol),
@@ -164,31 +175,29 @@ async def run_backtest(backtest_id: int) -> None:
                         trade_id = trade.id
                         position = Position(
                             trade_id=trade_id,
-                            side=order.side,
+                            side=side,
                             qty=order.qty,
                             entry_price=candle.close,
-                            entry_at=candle.ts,
+                            entry_time=candle.ts,
+                            mode="backtest",
                         )
                 else:
                     position.update_ltp(candle.close)
-                    strategy._call_on_tick(candle, position)
-                    should_exit = strategy._call_exit(candle, position)
+                    strategy._call_on_tick(tick, position)
+                    should_exit = strategy._call_exit(tick, position)
 
-                    # Risk backstop — 15:15 forced exit (check by time)
+                    # Risk backstop — 15:15 IST forced exit
                     if not should_exit:
-                        candle_time = candle.ts.astimezone(UTC)
-                        if candle_time.hour >= 15 and candle_time.minute >= 15:
+                        ist_time = candle.ts.astimezone(IST).time()
+                        if ist_time >= _SQUAREOFF:
                             should_exit = True
 
                     if should_exit and trade_id is not None:
                         trade = await session.get(Trade, trade_id)
                         if trade:
-                            pnl = (candle.close - position.entry_price) * position.qty
-                            if position.side == "SELL":
-                                pnl = -pnl
                             trade.exit_price = candle.close
                             trade.exit_at = candle.ts
-                            trade.pnl = round(pnl, 2)
+                            trade.pnl = round(position.pnl, 2)  # LONG/SHORT-aware
                             trade.status = "closed"
                             trade.exit_reason = "strategy"
                         position = None
@@ -198,14 +207,12 @@ async def run_backtest(backtest_id: int) -> None:
             if position and trade_id:
                 last = raw_candles[-1]
                 last_price = float(last["close"])
+                position.update_ltp(last_price)
                 trade = await session.get(Trade, trade_id)
                 if trade:
-                    pnl = (last_price - position.entry_price) * position.qty
-                    if position.side == "SELL":
-                        pnl = -pnl
                     trade.exit_price = last_price
                     trade.exit_at = candle.ts if raw_candles else datetime.now(UTC)
-                    trade.pnl = round(pnl, 2)
+                    trade.pnl = round(position.pnl, 2)  # LONG/SHORT-aware
                     trade.status = "closed"
                     trade.exit_reason = "forced_squareoff"
 
